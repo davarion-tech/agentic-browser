@@ -12,7 +12,12 @@ Las personas usamos navegadores para movernos por la web; los agentes normalment
 
 [English](README.md) · [Casos de uso](docs/USE_CASES.md) · [Vigilante de chats](docs/WATCHER.md) · [Arquitectura](docs/ARCHITECTURE.md) · [Seguridad](SECURITY.md) · [Aviso de responsabilidad](DISCLAIMER.md)
 
-![Cursor del agente haciendo clic](docs/cursor.jpg)
+<p align="center"><img src="docs/assets/demo-prices-es.jpg" width="100%" alt="El agente compara el precio de un producto en dos tiendas y dice dónde es más barato"></p>
+<p align="center">
+  <img src="docs/assets/demo-research-es.jpg" width="49%" alt="El agente busca en Wikipedia, lee el artículo y lo resume">
+  <img src="docs/assets/demo-form-es.jpg" width="49%" alt="El agente rellena un formulario y se detiene antes de enviarlo">
+</p>
+<p align="center"><em>Ejecuciones reales grabadas por el propio agente: comparar precios · investigar en la web · rellenar un formulario y detenerse antes de enviar.</em></p>
 
 ## Por qué
 

@@ -12,7 +12,12 @@ Humans browse the web with browsers. Agents usually need APIs. agentic-browser l
 
 [Español](README.es.md) · [Use cases](docs/USE_CASES.md) · [Chat watcher](docs/WATCHER.md) · [Architecture](docs/ARCHITECTURE.md) · [Security](SECURITY.md) · [Disclaimer](DISCLAIMER.md)
 
-![Agent cursor clicking a button](docs/cursor.jpg)
+<p align="center"><img src="docs/assets/demo-prices-en.jpg" width="100%" alt="The agent compares a product's price in two stores and says where it is cheaper"></p>
+<p align="center">
+  <img src="docs/assets/demo-research-en.jpg" width="49%" alt="The agent searches Wikipedia, reads the article and sums it up">
+  <img src="docs/assets/demo-form-en.jpg" width="49%" alt="The agent fills in a form and stops before submitting">
+</p>
+<p align="center"><em>Real runs recorded by the agent itself: compare prices · research the web · fill a form and stop before submitting.</em></p>
 
 ## Why
 
