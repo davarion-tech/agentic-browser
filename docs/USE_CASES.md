@@ -59,7 +59,21 @@ The visible cursor, click ripples and action labels make agent behaviour easy to
 
 El cursor visible, las ondas de clic y las etiquetas de acción permiten seguir lo que hace el agente en vivo o en una grabación de pantalla. Sirve para demos, formación y para ganar confianza antes de darle más autonomía.
 
-## 7. Plugging into any agent framework / Conectarlo a cualquier framework de agentes
+## 7. Demo videos / Vídeos de demostración
+
+The agent can record its own demo clips, red cursor and action labels included, without OBS or any screen recorder:
+
+1. `browser_record_start({ demo: true })`: `demo` slows the cursor down while recording so viewers can follow it. Optional: `fps` (25), `maxSeconds` (120, max 600), `file`, `format`.
+2. Run the task with the usual tools. Pauses where nothing changes keep their real length in the video.
+3. `browser_record_stop()` returns `{ file, format, seconds, bytes, frames }`. Files go to `~/.agentic-browser/recordings/` (`AGENT_RECORDINGS`).
+
+- **MP4 (H.264)** when `ffmpeg` is on the PATH (or `AGENT_FFMPEG` points to it). Encoding takes a second or two.
+- **WebM fallback, no native dependencies:** without ffmpeg the frames are replayed inside Chrome and captured with `MediaRecorder`. Stopping takes about as long as the clip, and some players don't show a WebM's total duration until it is played or remuxed.
+- Only the tab that was active at `browser_record_start` is recorded, and only page content: Chrome's own UI and native dialogs don't appear. In a visible window the tab must stay on screen; minimized or background tabs don't produce frames.
+
+El agente puede grabar sus propios clips de demo, con el cursor rojo y las etiquetas de acción, sin OBS ni grabador de pantalla: `browser_record_start({ demo: true })`, la tarea con las herramientas de siempre y `browser_record_stop()`, que devuelve ruta, duración y tamaño. Las pausas sin cambios conservan su duración real. Genera MP4 (H.264) si hay `ffmpeg` en el PATH; si no, un WebM sin dependencias nativas que tarda en generarse lo mismo que dura el clip. Solo se graba el contenido de la pestaña que estaba activa al empezar, no la interfaz de Chrome; en modo con ventana la pestaña debe quedar visible.
+
+## 8. Plugging into any agent framework / Conectarlo a cualquier framework de agentes
 
 - **MCP clients** (Claude Code, Claude Desktop, Cursor, Codex, Hermes, OpenClaw, Agent SDK…): register `src/mcp.js`.
 - **Anything else** (Python, LangChain, n8n, custom loops): run `npm run http`. Then `GET /tools` returns JSON Schemas you can pass as function/tool definitions to any LLM API.

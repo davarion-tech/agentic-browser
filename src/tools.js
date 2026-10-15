@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { formatSnapshot, diffSnapshot } from './perception.js';
+import { Recorder } from './recorder.js';
 
 const TRACE = process.env.AGENT_TRACE || path.join(os.homedir(), '.agentic-browser', 'trace.jsonl');
 const READONLY = process.env.AGENT_READONLY === '1';
@@ -32,6 +33,8 @@ function brief(d) {
 }
 
 export function createTools(ab) {
+  const recorder = new Recorder(ab);
+
   async function settle(page, before) {
     await sleep(120);
     if (page.url() !== before) await page.waitForLoadState('domcontentloaded', { timeout: 8000 }).catch(() => {});
@@ -354,6 +357,28 @@ export function createTools(ab) {
         await page.evaluate(([v, t]) => { const c = window.__agentCursor; if (!c) return; if (v === true) c.show(); if (v === false) c.hide(); if (t !== undefined && t !== null) c.trail(t); }, [visible, trail]);
         return 'ok';
       },
+    },
+    {
+      name: 'browser_record_start',
+      description: 'Empieza a grabar en vídeo la pestaña activa (con el cursor rojo visible) para clips de demostración. Sigue usando las demás herramientas y termina con browser_record_stop. Las pausas sin cambios conservan su duración real. MP4 (H.264) si hay ffmpeg en el PATH; si no, WebM.',
+      schema: {
+        fps: z.number().optional().describe('Fotogramas por segundo del vídeo final (25)'),
+        maxSeconds: z.number().optional().describe('Se detiene sola tras estos segundos (120, máx. 600)'),
+        file: z.string().optional().describe('Nombre o ruta del archivo; relativo a ~/.agentic-browser/recordings'),
+        format: z.enum(['mp4', 'webm']).optional().describe('mp4 requiere ffmpeg; webm no tiene dependencias pero tarda lo que dura el clip al parar'),
+        demo: z.boolean().optional().describe('Ralentiza el cursor mientras se graba para que se lea mejor'),
+      },
+      async run(a) {
+        const page = await ab.active();
+        const r = await recorder.start(page, a);
+        return `grabando → ${r.out} (${r.format}, ${r.fps} fps${a.demo ? ', cursor lento' : ''})${r.notes.length ? '\n' + r.notes.join('\n') : ''}`;
+      },
+    },
+    {
+      name: 'browser_record_stop',
+      description: 'Detiene la grabación de browser_record_start y codifica el vídeo. Devuelve ruta, duración (s), tamaño y formato.',
+      schema: {},
+      async run() { return JSON.stringify(await recorder.stop()); },
     },
     {
       name: 'browser_screenshot',

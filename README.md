@@ -118,6 +118,7 @@ viewport 1280x800 scroll=0,0 docH=2090
 | `browser_request_human` | Hand control to the person watching (login, 2FA, CAPTCHA, a decision) through an on-page banner |
 | `browser_console` / `browser_events` / `browser_trace` | JS console and errors; dialogs, downloads and new tabs; audit trail of every action |
 | `browser_cursor_style` | Show or hide the cursor or its trail |
+| `browser_record_start` / `browser_record_stop` | Record the active tab as a video, red cursor included, for demo clips without OBS. MP4 (H.264) when `ffmpeg` is on the PATH, otherwise WebM. Returns path, duration and size |
 | `browser_screenshot` | Last resort: JPEG of the page or of a single `ref` |
 
 Most actions accept `snapshot: true` and return the new page state in the same response, which saves one agent turn per step.
@@ -140,6 +141,8 @@ Most actions accept `snapshot: true` and return the new page state in the same r
 | `AGENT_TRACE` | `~/.agentic-browser/trace.jsonl` | Audit log of every tool call |
 | `AGENT_CHROME` | auto-detected | Path to the browser. Any Chromium browser works: Chrome, Edge (falls back to it automatically), Brave, Chromium |
 | `AGENT_HTTP_PORT` / `AGENT_TOKEN` | `8787` / — | HTTP port and optional Bearer token |
+| `AGENT_RECORDINGS` | `~/.agentic-browser/recordings` | Where `browser_record_stop` saves videos |
+| `AGENT_FFMPEG` | `ffmpeg` | Path to ffmpeg for MP4 recordings; `none` forces the WebM fallback |
 
 ## Limits
 

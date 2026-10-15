@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -102,6 +103,28 @@ assert.equal(w.reason, 'mutation');
 await call('browser_cursor'); await call('browser_cursor');
 assert.match(await call('browser_cursor'), /repetido esta misma acción 3 veces/);
 assert.match(await call('browser_trace', { limit: 3 }), /browser_cursor/);
+
+// Grabación: unos segundos con movimiento y una pausa sin cambios (debe conservar su duración)
+const hasFfmpeg = spawnSync(process.env.AGENT_FFMPEG || 'ffmpeg', ['-version'], { stdio: 'ignore' }).status === 0;
+const probe = file => {
+  const r = spawnSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', file], { encoding: 'utf8' });
+  return r.status === 0 ? Number(r.stdout.trim()) : null;
+};
+for (const format of hasFfmpeg ? ['mp4', 'webm'] : ['webm']) {
+  console.log(await call('browser_record_start', { file: `smoke-demo.${format}`, format, demo: true }));
+  snap = await call('browser_snapshot');
+  await call('browser_move', { ref: refOf(snap, /button "Abrir modal"/) });
+  await call('browser_move', { ref: refOf(snap, /button "Buscar"/) });
+  await call('browser_wait', { ms: 1200 });
+  const rec = JSON.parse(await call('browser_record_stop'));
+  console.log('record:', rec);
+  assert.ok(fs.existsSync(rec.file) && fs.statSync(rec.file).size > 1000, `no existe ${rec.file}`);
+  assert.equal(rec.format, format);
+  assert.ok(rec.seconds > 1, `duración ${rec.seconds}s`);
+  const d = format === 'mp4' ? probe(rec.file) : null;
+  if (d !== null) { console.log(`ffprobe: ${d}s`); assert.ok(d > 1, `ffprobe dice ${d}s`); }
+}
+await assert.rejects(call('browser_record_stop'), /no hay ninguna grabación/);
 
 console.log(await call('browser_tabs', { action: 'list' }));
 const shot = await call('browser_screenshot', {});

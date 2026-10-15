@@ -108,6 +108,7 @@ Funciona con tu suscripción de Claude (`claude setup-token`) o con una API key.
 | `browser_request_human` | Pasa el control a la persona que mira (login, 2FA, CAPTCHA, una decisión) con un banner en la página |
 | `browser_console` / `browser_events` / `browser_trace` | Consola y errores JS; diálogos, descargas y pestañas nuevas; registro de auditoría de cada acción |
 | `browser_cursor_style` | Mostrar u ocultar el cursor o su estela |
+| `browser_record_start` / `browser_record_stop` | Graba en vídeo la pestaña activa, con el cursor rojo, para clips de demo sin OBS. MP4 (H.264) si `ffmpeg` está en el PATH; si no, WebM. Devuelve ruta, duración y tamaño |
 | `browser_screenshot` | Último recurso: JPEG de la página o de un solo `ref` |
 
 **Fiabilidad:** si la página se re-renderiza, el ref se recupera cuando el elemento se puede identificar sin ambigüedad. Los clics avisan si un modal tapa el objetivo (`occluded`). Se recorren shadow DOM abierto e iframes. Las pestañas nuevas, los diálogos y las descargas se informan en la respuesta de la acción. Repetir la misma llamada tres veces dispara un aviso de bucle.
@@ -128,6 +129,8 @@ Funciona con tu suscripción de Claude (`claude setup-token`) o con una API key.
 | `AGENT_TRACE` | `~/.agentic-browser/trace.jsonl` | Registro de auditoría de cada llamada |
 | `AGENT_CHROME` | autodetectado | Ruta al navegador. Sirve cualquier Chromium: Chrome, Edge (se usa solo si no hay Chrome), Brave, Chromium |
 | `AGENT_HTTP_PORT` / `AGENT_TOKEN` | `8787` / — | Puerto HTTP y token Bearer opcional |
+| `AGENT_RECORDINGS` | `~/.agentic-browser/recordings` | Carpeta donde `browser_record_stop` guarda los vídeos |
+| `AGENT_FFMPEG` | `ffmpeg` | Ruta a ffmpeg para grabar en MP4; `none` fuerza el WebM sin dependencias |
 
 ## Límites
 
