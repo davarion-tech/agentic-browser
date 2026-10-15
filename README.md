@@ -12,6 +12,13 @@ Humans browse the web with browsers. Agents usually need APIs. agentic-browser l
 
 [Español](README.es.md) · [Use cases](docs/USE_CASES.md) · [Chat watcher](docs/WATCHER.md) · [Architecture](docs/ARCHITECTURE.md) · [Security](SECURITY.md) · [Disclaimer](DISCLAIMER.md)
 
+<p align="center">
+  <a href="docs/media/agentic-browser-15s.mp4"><img src="docs/assets/demo.gif" width="100%" alt="15-second demo of agentic-browser"></a>
+</p>
+<p align="center">
+  ▶ <a href="docs/media/agentic-browser-15s.mp4"><b>Watch the 15-second demo</b></a> · ▶ <a href="docs/media/agentic-browser-promo.mp4"><b>Watch the full video (1 min)</b></a>
+</p>
+
 <p align="center"><img src="docs/assets/demo-prices-en.jpg" width="100%" alt="The agent compares a product's price in two stores and says where it is cheaper"></p>
 <p align="center">
   <img src="docs/assets/demo-research-en.jpg" width="49%" alt="The agent searches Wikipedia, reads the article and sums it up">

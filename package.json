@@ -48,12 +48,20 @@
     "README.es.md",
     "README.md",
     "SECURITY.md",
-    "docs",
+    "docs/*.md",
+    "docs/assets/logo.svg",
     "examples",
     "scripts",
     "skills",
     "src",
     "watcher.config.example.json"
   ],
-  "homepage": "https://www.davarion.com"
+  "homepage": "https://www.davarion.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/davarion-tech/agentic-browser.git"
+  },
+  "bugs": {
+    "url": "https://github.com/davarion-tech/agentic-browser/issues"
+  }
 }
