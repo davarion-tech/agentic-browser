@@ -27,7 +27,7 @@ Medición real: una búsqueda en Wikipedia de 7 pasos gastó **≈ 2.540 tokens*
 Requisitos: Node ≥ 18 y Google Chrome.
 
 ```bash
-git clone https://github.com/<org>/agentic-browser.git
+git clone https://github.com/davarion-tech/agentic-browser.git
 ```
 
 ```bash

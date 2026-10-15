@@ -25,7 +25,7 @@ Humans browse the web with browsers. Agents usually need APIs. agentic-browser l
 Requirements: Node ≥ 18 and Google Chrome.
 
 ```bash
-git clone https://github.com/<org>/agentic-browser.git
+git clone https://github.com/davarion-tech/agentic-browser.git
 ```
 
 ```bash
