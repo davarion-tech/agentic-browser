@@ -6,6 +6,8 @@
 
 Built and maintained by **[Davarion](https://www.davarion.com)**.
 
+> **No API key. No extra bill.** agentic-browser is a tool, not a model: it runs on your computer and uses whatever brain your agent already has. That can be your Claude Pro/Max plan in Claude Code, your ChatGPT plan in Codex, Cursor, or a local model. Nothing to sign up for and no per-token charges from us.
+
 Humans browse the web with browsers. Agents usually need APIs. agentic-browser lets any agent use **your installed Google Chrome** the way a person does. It perceives pages as compact text with pixel coordinates instead of screenshots, and a visible cursor shows every move and click.
 
 [Español](README.es.md) · [Use cases](docs/USE_CASES.md) · [Chat watcher](docs/WATCHER.md) · [Architecture](docs/ARCHITECTURE.md) · [Security](SECURITY.md) · [Disclaimer](DISCLAIMER.md)
@@ -21,6 +23,7 @@ Humans browse the web with browsers. Agents usually need APIs. agentic-browser l
 | You can't see what the agent is doing | A red cursor travels to each target, ripples on click and labels the action |
 | Locked into one agent framework | MCP server **and** a plain HTTP/JSON API: Claude, GPT, Gemini, Hermes, OpenClaw, LangChain, n8n, curl… |
 | Stripped-down Chromium builds | Your real Chrome: extensions, codecs, PDF, WebGPU, auto-updates |
+| Yet another API key and bill | **None.** Works with the subscription your agent already uses; even the optional chat watcher can run on your Claude plan |
 
 ## Quick start
 
