@@ -1,5 +1,5 @@
 {
-  "name": "agentic-browser",
+  "name": "agentic-browser-mcp",
   "version": "1.0.0",
   "description": "Agentic browser on top of your real Chrome: MCP + HTTP API, token-cheap text perception with pixel coordinates, and a visible agent cursor",
   "main": "src/mcp.js",
@@ -34,7 +34,10 @@
     "zod": "^4.6.7"
   },
   "bin": {
-    "agentic-browser": "src/mcp.js"
+    "agentic-browser-mcp": "src/mcp.js",
+    "agentic-browser-http": "src/http.js",
+    "agentic-browser-watcher": "src/watcher.js",
+    "agentic-browser-setup": "src/setup.js"
   },
   "engines": {
     "node": ">=18"
