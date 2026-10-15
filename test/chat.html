@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><title>MockChat</title>
+<style>
+body{margin:0;font:14px system-ui;display:flex;height:100vh}
+#side{width:220px;border-right:1px solid #ddd;padding:8px}
+#side button{display:flex;justify-content:space-between;width:100%;padding:10px;margin:2px 0;border:0;background:#f4f4f5;border-radius:8px;cursor:pointer}
+.badge{background:#22c55e;color:#fff;border-radius:10px;padding:0 7px}
+#main{flex:1;display:flex;flex-direction:column}
+#msgs{flex:1;overflow:auto;padding:12px}
+.m{margin:6px 0;padding:8px 10px;border-radius:10px;max-width:60%}
+.in{background:#f1f5f9}.out{background:#dcfce7;margin-left:auto}
+#box{margin:10px;padding:10px;font:inherit}
+</style></head>
+<body>
+<nav id="side"></nav>
+<main id="main"><h2 id="who" style="margin:12px">Elige un chat</h2><div id="msgs"></div>
+<textarea id="box" rows="2" placeholder="Escribe un mensaje"></textarea></main>
+<script>
+const chats = JSON.parse(localStorage.getItem('chats') || '{}');   // nombre -> {msgs:[{dir,text}], unread}
+let open = null;
+function render() {
+  localStorage.setItem('chats', JSON.stringify(chats));
+  const total = Object.values(chats).reduce((a, c) => a + c.unread, 0);
+  document.title = total ? `(${total}) MockChat` : 'MockChat';
+  side.innerHTML = '';
+  for (const [n, c] of Object.entries(chats)) {
+    const b = document.createElement('button');
+    b.innerHTML = `<span>${n}</span>` + (c.unread ? `<span class="badge">${c.unread}</span>` : '');
+    b.onclick = () => { open = n; c.unread = 0; render(); };
+    side.append(b);
+  }
+  who.textContent = open || 'Elige un chat';
+  msgs.innerHTML = '';
+  for (const m of open ? chats[open].msgs : []) {
+    const d = document.createElement('div'); d.className = 'm ' + m.dir; d.innerHTML = m.html || ''; if (!m.html) d.textContent = m.text;
+    msgs.append(d);
+  }
+}
+window.__incoming = (n, text, html) => { (chats[n] ||= { msgs: [], unread: 0 }); chats[n].msgs.push({ dir: 'in', text, html }); if (open !== n) chats[n].unread++; render(); };
+window.__sent = n => (chats[n]?.msgs || []).filter(m => m.dir === 'out').map(m => m.text);
+box.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    if (open && box.value.trim()) { chats[open].msgs.push({ dir: 'out', text: box.value }); box.value = ''; render(); }
+  }
+});
+render();
+</script>
+</body></html>

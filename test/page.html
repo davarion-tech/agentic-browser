@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><title>Banco de pruebas</title>
+<style>body{font:15px system-ui;margin:40px}button,input,select{font:inherit;padding:6px 10px;margin:6px}
+#far{margin-top:1600px}iframe{width:420px;height:120px;border:1px solid #ccc}</style></head>
+<body>
+<h1>Banco de pruebas del navegador agéntico</h1>
+<label for="q">Buscar</label> <input id="q" placeholder="escribe algo">
+<button id="go" onclick="document.getElementById('out').textContent='buscado: '+q.value">Buscar</button>
+<select id="color"><option>Rojo</option><option>Verde</option><option>Azul</option></select>
+<label><input type="checkbox" id="ok"> Acepto</label>
+<p id="out">sin resultado</p>
+<div id="hov" onmouseover="this.textContent='hover detectado'" style="display:inline-block;padding:10px;background:#eef">pasa el ratón</div>
+<iframe srcdoc="<button onclick=&quot;this.textContent='clic en iframe'&quot;>Botón del iframe</button>"></iframe>
+<my-widget></my-widget>
+<script>
+customElements.define('my-widget', class extends HTMLElement {
+  connectedCallback() {
+    const r = this.attachShadow({ mode: 'open' });
+    r.innerHTML = '<button id="sb">Botón en shadow DOM</button><span id="ss"></span>';
+    r.getElementById('sb').onclick = () => (r.getElementById('ss').textContent = 'shadow pulsado');
+  }
+});
+</script>
+<div id="rr"><button onclick="document.getElementById('rr').innerHTML = this.outerHTML; window.rerenders=(window.rerenders||0)+1">Rerender</button></div>
+<button id="openModal" onclick="modal.style.display='block'">Abrir modal</button>
+<div id="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4)"><button onclick="modal.style.display='none'" style="margin:200px auto;display:block">Cerrar modal</button></div>
+<p id="far"><a href="#top" onclick="this.textContent='enlace lejano pulsado';return false">Enlace lejano</a></p>
+</body></html>

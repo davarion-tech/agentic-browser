@@ -1,0 +1,55 @@
+{
+  "name": "agentic-browser",
+  "version": "1.0.0",
+  "description": "Agentic browser on top of your real Chrome: MCP + HTTP API, token-cheap text perception with pixel coordinates, and a visible agent cursor",
+  "main": "src/mcp.js",
+  "scripts": {
+    "mcp": "node src/mcp.js",
+    "http": "node src/http.js",
+    "test": "node test/smoke.js",
+    "doctor": "node src/doctor.js",
+    "watcher": "node src/watcher.js",
+    "test:watcher": "node test/watcher.test.js",
+    "setup": "node src/setup.js",
+    "test:watcher:claude": "node test/watcher.claude-code.test.js",
+    "postinstall": "node scripts/postinstall.js"
+  },
+  "keywords": [
+    "mcp",
+    "browser",
+    "agent",
+    "chrome",
+    "cdp",
+    "playwright",
+    "ai-agents",
+    "automation"
+  ],
+  "author": "Oscar Fonseca",
+  "license": "MIT",
+  "type": "module",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.134.0",
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "playwright-core": "^1.64.1",
+    "zod": "^4.6.7"
+  },
+  "bin": {
+    "agentic-browser": "src/mcp.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "DISCLAIMER.md",
+    "LICENSE",
+    "README.es.md",
+    "README.md",
+    "SECURITY.md",
+    "docs",
+    "examples",
+    "scripts",
+    "skills",
+    "src",
+    "watcher.config.example.json"
+  ]
+}

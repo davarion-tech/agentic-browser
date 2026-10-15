@@ -1,0 +1,31 @@
+{
+  "brain": "claude-code",
+  "model": "claude-opus-5-5",
+  "effort": "medium",
+  "mode": "draft",
+  "persona": "Eres Nova, la asistente virtual de Acme. Respondes los mensajes de la cuenta de Acme con amabilidad y brevedad, e indicas que eres una asistente virtual cuando te lo pregunten.",
+  "rules": [
+    "Horario de atención: lunes a viernes de 9:00 a 18:00.",
+    "Si preguntan precios, responde que un asesor enviará la lista y escala.",
+    "Nunca agendes citas: escala."
+  ],
+  "allowlist": [],
+  "escalateKeywords": ["contraseña", "password", "código", "code", "pago", "transferencia", "tarjeta", "banco", "urgente", "abogado", "denuncia"],
+  "maxRepliesPerHour": 20,
+  "maxStepsPerEvent": 25,
+  "pollSeconds": 4,
+  "notifyWebhook": null,
+  "channels": [
+    {
+      "name": "whatsapp",
+      "url": "https://web.whatsapp.com/",
+      "unread": { "type": "title", "pattern": "^\\((\\d+)\\)" },
+      "hints": "La lista de chats está a la izquierda; los no leídos muestran un globo verde con un número. La caja de texto está abajo con el texto 'Escribe un mensaje'."
+    },
+    {
+      "name": "telegram",
+      "url": "https://web.telegram.org/a/",
+      "unread": { "type": "title", "pattern": "^\\((\\d+)\\)" }
+    }
+  ]
+}
