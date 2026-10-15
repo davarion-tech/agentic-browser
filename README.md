@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/assets/logo.svg" width="128" alt="agentic-browser logo"></p>
+
 # agentic-browser
 
 **Give any AI agent a real browser and watch everything it does.**
