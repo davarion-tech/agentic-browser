@@ -3,3 +3,8 @@ test/last-screenshot.jpg
 *.log
 .env
 watcher.config.json
+
+# Notas internas y contexto privado: nunca al repositorio publico
+CLAUDE.md
+CLAUDE.local.md
+internal/

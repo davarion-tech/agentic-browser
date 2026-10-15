@@ -2,6 +2,8 @@
 
 **Give any AI agent a real browser and watch everything it does.**
 
+Built and maintained by **[Davarion](https://www.davarion.com)**.
+
 Humans browse the web with browsers. Agents usually need APIs. agentic-browser lets any agent use **your installed Google Chrome** the way a person does. It perceives pages as compact text with pixel coordinates instead of screenshots, and a visible cursor shows every move and click.
 
 [Español](README.es.md) · [Use cases](docs/USE_CASES.md) · [Chat watcher](docs/WATCHER.md) · [Architecture](docs/ARCHITECTURE.md) · [Security](SECURITY.md) · [Disclaimer](DISCLAIMER.md)
@@ -166,4 +168,4 @@ Based on the most common complaints about browser agents (stale refs, token bloa
 
 Released under the [MIT License](LICENSE). Provided **as is, without warranty**. **You are solely responsible for how you and your agents use this software.** That includes compliance with the law and with the terms of service of the sites you automate. Read the full [Disclaimer](DISCLAIMER.md).
 
-Not affiliated with Google. "Google Chrome" is a trademark of Google LLC.
+Made by [Davarion](https://www.davarion.com). Not affiliated with Google. "Google Chrome" is a trademark of Google LLC.

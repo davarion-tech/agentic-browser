@@ -20,7 +20,7 @@ By using agentic-browser you agree that **it is your responsibility** to:
 
 **Prohibited uses** we do not support in any way: spam or unsolicited bulk messaging, fraud, impersonation, harassment, credential theft or phishing, unauthorized access to systems or accounts, circumventing CAPTCHAs, rate limits, paywalls or anti-bot protections, and any illegal activity.
 
-This project is **not affiliated with, endorsed by, or sponsored by Google LLC**. "Google Chrome" and "Chromium" are trademarks of Google LLC. Other names are trademarks of their respective owners.
+This project is published by Davarion (https://www.davarion.com) and is **not affiliated with, endorsed by, or sponsored by Google LLC**. "Google Chrome" and "Chromium" are trademarks of Google LLC. Other names are trademarks of their respective owners.
 
 This disclaimer is not legal advice. If you plan to use agentic-browser commercially or at scale, consult a lawyer.
 
@@ -46,6 +46,6 @@ Al usar agentic-browser aceptas que **es tu responsabilidad**:
 
 **Usos prohibidos** que no apoyamos de ninguna forma: spam o mensajes masivos no solicitados, fraude, suplantación de identidad, acoso, robo de credenciales o phishing, acceso no autorizado a sistemas o cuentas, eludir CAPTCHAs, límites de uso, muros de pago o protecciones anti-bot, y cualquier actividad ilegal.
 
-Este proyecto **no está afiliado, respaldado ni patrocinado por Google LLC**. "Google Chrome" y "Chromium" son marcas de Google LLC. Otros nombres son marcas de sus respectivos titulares.
+Este proyecto lo publica Davarion (https://www.davarion.com) y **no está afiliado, respaldado ni patrocinado por Google LLC**. "Google Chrome" y "Chromium" son marcas de Google LLC. Otros nombres son marcas de sus respectivos titulares.
 
 Este aviso no constituye asesoría legal. Si piensas usar agentic-browser comercialmente o a gran escala, consulta con un abogado.

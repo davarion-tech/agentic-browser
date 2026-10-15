@@ -24,7 +24,7 @@
     "ai-agents",
     "automation"
   ],
-  "author": "Oscar Fonseca",
+  "author": "Davarion (https://www.davarion.com)",
   "license": "MIT",
   "type": "module",
   "dependencies": {
@@ -54,5 +54,6 @@
     "skills",
     "src",
     "watcher.config.example.json"
-  ]
+  ],
+  "homepage": "https://www.davarion.com"
 }
