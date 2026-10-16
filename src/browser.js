@@ -49,6 +49,10 @@ export class AgentBrowser {
     this.nextFrameId = 1;
     this.starting = null;
     this.lastSnap = new WeakMap();   // page -> último snapshot (para diff)
+    this.lastAgentAction = 0;        // ms de la última acción de entrada del agente (clic, tecla...)
+    this.prevPages = [];             // pila de pestañas activas anteriores (para volver al cerrar)
+    this.openers = new WeakMap();    // page -> page que la abrió
+    this.ownPending = 0;             // pestañas que está creando el propio agente (browser_tabs new)
     const allow = process.env.AGENT_ALLOWED_ORIGINS;
     this.allowed = allow ? allow.split(',').map(h => h.trim().toLowerCase()).filter(Boolean) : null;
   }
@@ -98,14 +102,53 @@ export class AgentBrowser {
     }
     await this.context.addInitScript(overlayScript);
     await this.context.addInitScript(perceptionScript);
-    this.context.on('page', p => {
-      this._wire(p);
-      this.events.push({ type: 'new-tab', index: this.context.pages().indexOf(p), url: p.url(), note: 'ahora es la pestaña activa' });
-      this.page = p;
-    });
+    this.context.on('page', p => this._onPage(p));
     this.context.on('close', () => { this.context = null; this.page = null; });
     for (const p of this.context.pages()) this._wire(p);
-    this.page = this.context.pages()[0] || await this.context.newPage();
+    this.page = this.context.pages()[0] || await this.newTab();
+  }
+
+  // Marca una acción de entrada del agente: solo los popups que provoque pasan a ser la pestaña activa
+  markAction() { this.lastAgentAction = Date.now(); }
+
+  // Pestaña creada explícitamente por el agente: siempre pasa a ser la activa
+  async newTab() {
+    this.ownPending++;
+    try { const p = await this.context.newPage(); this.setActive(p); return p; } finally { this.ownPending = Math.max(0, this.ownPending - 1); }
+  }
+
+  setActive(p) {
+    if (!p || p === this.page) return;
+    if (this.page && !this.page.isClosed()) {
+      this.prevPages = this.prevPages.filter(x => x !== this.page && !x.isClosed());
+      this.prevPages.push(this.page);
+      if (this.prevPages.length > 10) this.prevPages.shift();
+    }
+    this.page = p;
+  }
+
+  // Una pestaña nueva solo se activa si la abrió la pestaña activa justo tras una acción del agente.
+  // Los popups que abren las webs solas (One Tap de Google, anuncios) quedan en segundo plano.
+  async _onPage(p) {
+    this._wire(p);
+    if (this.ownPending > 0) return; // la gestiona newTab()
+    const t = Date.now(), active = this.page;
+    const opener = await p.opener().catch(() => null);
+    if (opener) this.openers.set(p, opener);
+    const index = this.context?.pages().indexOf(p) ?? -1;
+    if (opener && opener === active && t - this.lastAgentAction < 2000) {
+      this.events.push({ type: 'new-tab', index, url: p.url(), note: 'ahora es la pestaña activa' });
+      this.setActive(p);
+    } else this.events.push({ type: 'background-tab', index, url: p.url(), note: 'la abrió la página, no se activa' });
+  }
+
+  // Al cerrar la activa: su opener, si no la anterior de la pila, si no la última
+  _fallback(closed) {
+    const alive = x => x && x !== closed && !x.isClosed() && this.context?.pages().includes(x);
+    const o = this.openers.get(closed);
+    if (alive(o)) return o;
+    this.prevPages = this.prevPages.filter(alive);
+    return this.prevPages.pop() || this.context?.pages().filter(x => x !== closed).at(-1) || null;
   }
 
   _wire(page) {
@@ -126,12 +169,12 @@ export class AgentBrowser {
       const c = this.cursor.get(page);
       if (c) page.evaluate(([x, y]) => window.__agentCursor?.move(x, y), [c.x, c.y]).catch(() => {});
     });
-    page.on('close', () => { if (this.page === page) this.page = this.context?.pages().at(-1) || null; });
+    page.on('close', () => { if (this.page === page) this.page = this._fallback(page); });
   }
 
   async active() {
     await this.start();
-    if (!this.page || this.page.isClosed()) this.page = this.context.pages().at(-1) || await this.context.newPage();
+    if (!this.page || this.page.isClosed()) this.page = (this.page && this._fallback(this.page)) || this.context.pages().at(-1) || await this.newTab();
     return this.page;
   }
 

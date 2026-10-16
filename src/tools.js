@@ -10,6 +10,8 @@ import { Recorder } from './recorder.js';
 
 const TRACE = process.env.AGENT_TRACE || path.join(os.homedir(), '.agentic-browser', 'trace.jsonl');
 const READONLY = process.env.AGENT_READONLY === '1';
+// Acciones de entrada: solo los popups que abran ellas pasan a ser la pestaña activa
+const INPUT = new Set(['browser_click', 'browser_type', 'browser_press', 'browser_drag', 'browser_select', 'browser_upload']);
 const MUTATING = new Set(['browser_click', 'browser_type', 'browser_press', 'browser_drag', 'browser_select', 'browser_upload', 'browser_eval']);
 const CORE = ['browser_navigate', 'browser_snapshot', 'browser_find', 'browser_click', 'browser_type', 'browser_press',
   'browser_scroll', 'browser_read', 'browser_element_at', 'browser_watch', 'browser_request_human', 'browser_tabs'];
@@ -160,6 +162,7 @@ export function createTools(ab) {
         const r = await pointerAt(t, clickCount > 1 ? 'doble clic' : button === 'right' ? 'clic derecho' : 'clic');
         const u = r.page.url();
         await ab.ripple(r.page, r.x, r.y, button === 'right');
+        ab.markAction();
         await withModifiers(r.page, modifiers, () => r.page.mouse.click(r.x, r.y, { button, clickCount, delay: 40 }));
         return after(r.page, u, `ok clic @${r.x},${r.y} en ${brief(r.target)}`, snapshot);
       },
@@ -180,12 +183,14 @@ export function createTools(ab) {
         if (t.ref !== undefined || (t.x !== undefined && t.y !== undefined)) {
           const r = await pointerAt(t, 'escribir en');
           await ab.ripple(page, r.x, r.y);
+          ab.markAction();
           await page.mouse.click(r.x, r.y, { delay: 30 });
           where = brief(r.target);
         }
         if (clear) { await page.keyboard.press(isMac ? 'Meta+A' : 'Control+A'); await page.keyboard.press('Backspace'); }
+        ab.markAction();
         await page.keyboard.type(text, { delay });
-        if (submit) await page.keyboard.press('Enter');
+        if (submit) { ab.markAction(); await page.keyboard.press('Enter'); }
         return after(page, u, `ok escrito ${text.length} chars en ${where}${submit ? ' + Enter' : ''}`, snapshot);
       },
     },
@@ -195,7 +200,7 @@ export function createTools(ab) {
       schema: { keys: z.string(), snapshot: snap },
       async run({ keys, snapshot }) {
         const page = await ab.active(); const u = page.url();
-        for (const k of keys.split(/\s+/).filter(Boolean)) await page.keyboard.press(k);
+        for (const k of keys.split(/\s+/).filter(Boolean)) { ab.markAction(); await page.keyboard.press(k); }
         return after(page, u, `ok ${keys}`, snapshot);
       },
     },
@@ -224,9 +229,11 @@ export function createTools(ab) {
       async run({ from, to, snapshot }) {
         const a = await pointerAt(from, 'arrastrar');
         const u = a.page.url();
+        ab.markAction();
         await a.page.mouse.down();
         const b = await ab.resolve(to);
         await ab.moveTo(a.page, b.x, b.y);
+        ab.markAction();
         await a.page.mouse.up();
         return after(a.page, u, `ok arrastre @${a.x},${a.y} → @${b.x},${b.y}`, snapshot);
       },
@@ -240,6 +247,7 @@ export function createTools(ab) {
         const handle = await t.page.evaluateHandle(([x, y]) => document.elementFromPoint(x, y)?.closest('select'), [t.x, t.y]);
         const el = handle.asElement();
         if (!el) throw new Error('el ref no es un <select> del frame principal');
+        ab.markAction();
         const chosen = await el.selectOption(values.map(v => ({ label: v }))).catch(() => el.selectOption(values));
         return after(t.page, t.page.url(), `ok seleccionado ${JSON.stringify(chosen)}`, snapshot);
       },
@@ -325,8 +333,8 @@ export function createTools(ab) {
       async run({ action, index, url }) {
         await ab.start();
         let pages = ab.context.pages();
-        if (action === 'new') { const p = await ab.context.newPage(); ab.page = p; if (url) await p.goto(url, { waitUntil: 'domcontentloaded' }); }
-        if (action === 'select') { ab.page = pages[index]; await ab.page.bringToFront(); }
+        if (action === 'new') { const p = await ab.newTab(); if (url) await p.goto(url, { waitUntil: 'domcontentloaded' }); }
+        if (action === 'select') { if (!pages[index]) throw new Error(`no existe la pestaña ${index}`); ab.setActive(pages[index]); await ab.page.bringToFront(); }
         if (action === 'close') { await (pages[index ?? pages.indexOf(ab.page)]).close(); }
         pages = ab.context.pages();
         const rows = await Promise.all(pages.map(async (p, i) => `${p === ab.page ? '*' : ' '}${i} ${await p.title().catch(() => '')} — ${p.url()}`));
@@ -412,6 +420,7 @@ export function createTools(ab) {
         return out;
       } catch (e) { ok = false; out = e.message; throw e; }
       finally {
+        if (INPUT.has(t.name)) ab.markAction();
         const rec = { at: new Date().toISOString(), tool: t.name, args: Object.fromEntries(Object.entries(args).map(([k, v]) => [k, shorten(v)])),
           ms: Date.now() - t0, url: ab.page && !ab.page.isClosed() ? ab.page.url() : null, ok,
           result: typeof out === 'string' ? out.slice(0, 200) : out?.image ? '[imagen]' : null };

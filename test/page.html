@@ -24,5 +24,6 @@ customElements.define('my-widget', class extends HTMLElement {
 <div id="rr"><button onclick="document.getElementById('rr').innerHTML = this.outerHTML; window.rerenders=(window.rerenders||0)+1">Rerender</button></div>
 <button id="openModal" onclick="modal.style.display='block'">Abrir modal</button>
 <div id="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4)"><button onclick="modal.style.display='none'" style="margin:200px auto;display:block">Cerrar modal</button></div>
+<p><a id="blank" href="about:blank" target="_blank">Pestaña nueva</a> <button id="pop" onclick="window.open('about:blank')">Abrir popup</button></p>
 <p id="far"><a href="#top" onclick="this.textContent='enlace lejano pulsado';return false">Enlace lejano</a></p>
 </body></html>

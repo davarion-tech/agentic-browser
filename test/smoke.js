@@ -126,6 +126,32 @@ for (const format of hasFfmpeg ? ['mp4', 'webm'] : ['webm']) {
 }
 await assert.rejects(call('browser_record_stop'), /no hay ninguna grabación/);
 
+// Popups: los que abre la página sola quedan en segundo plano; los que provoca el agente se activan
+const activeTab = async () => (await call('browser_tabs', { action: 'list' })).split('\n').find(l => l.startsWith('*'));
+await call('browser_eval', { expression: 'setTimeout(() => window.open("about:blank"), 2500), 1' });
+await call('browser_wait', { ms: 3500 });
+const bg = JSON.parse(await call('browser_events'));
+console.log('popup solo:', bg);
+assert.ok(bg.some(e => e.type === 'background-tab'), 'falta el evento background-tab');
+assert.match(await activeTab(), /^\*0 Banco de pruebas/);
+assert.match(await call('browser_read', { selector: 'h1' }), /Banco de pruebas/);
+for (const q of ['Pestaña nueva', 'Abrir popup']) {
+  const r = await call('browser_click', { ref: (await call('browser_find', { query: q })).match(/^\[([^\]]+)\]/)[1] });
+  console.log(r);
+  assert.match(r, /"new-tab"/);
+  assert.match(await activeTab(), /^\*2 /);
+  // Al cerrarla, vuelve a la que la abrió (no a la última)
+  await call('browser_tabs', { action: 'close' });
+  assert.match(await activeTab(), /^\*0 Banco de pruebas/);
+}
+await call('browser_tabs', { action: 'close', index: 1 });
+assert.match(await activeTab(), /^\*0 Banco de pruebas/);
+const nt = await call('browser_tabs', { action: 'new', url: 'about:blank' });
+assert.match(nt.split('\n').find(l => l.startsWith('*')), /^\*1 /);
+await call('browser_tabs', { action: 'close' });
+assert.match(await activeTab(), /^\*0 Banco de pruebas/);
+assert.doesNotMatch(await call('browser_events'), /background-tab/);
+
 console.log(await call('browser_tabs', { action: 'list' }));
 const shot = await call('browser_screenshot', {});
 fs.writeFileSync(path.join(here, 'last-screenshot.jpg'), Buffer.from(shot.data, 'base64'));
