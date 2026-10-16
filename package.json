@@ -63,5 +63,6 @@
   },
   "bugs": {
     "url": "https://github.com/davarion-tech/agentic-browser/issues"
-  }
+  },
+  "mcpName": "io.github.davarion-tech/agentic-browser"
 }
