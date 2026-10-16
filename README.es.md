@@ -13,10 +13,10 @@ Las personas usamos navegadores para movernos por la web; los agentes normalment
 [English](README.md) · [Casos de uso](docs/USE_CASES.md) · [Vigilante de chats](docs/WATCHER.md) · [Arquitectura](docs/ARCHITECTURE.md) · [Seguridad](SECURITY.md) · [Aviso de responsabilidad](DISCLAIMER.md)
 
 <p align="center">
-  <a href="docs/media/agentic-browser-15s.mp4"><img src="docs/assets/demo.gif" width="100%" alt="Demo de 15 segundos de agentic-browser"></a>
+  <a href="docs/media/agentic-browser-15s-es.mp4"><img src="docs/assets/demo.gif" width="100%" alt="Demo de 15 segundos de agentic-browser"></a>
 </p>
 <p align="center">
-  ▶ <a href="docs/media/agentic-browser-15s.mp4"><b>Ver la demo de 15 segundos</b></a> · ▶ <a href="docs/media/agentic-browser-promo.mp4"><b>Ver el video completo (1 min)</b></a> <em>(en inglés)</em>
+  ▶ <a href="docs/media/agentic-browser-15s-es.mp4"><b>Ver la demo de 15 segundos</b></a> · ▶ <a href="docs/media/agentic-browser-promo-es.mp4"><b>Ver el video completo (1 min)</b></a>
 </p>
 
 <p align="center"><img src="docs/assets/demo-prices-es.jpg" width="100%" alt="El agente compara el precio de un producto en dos tiendas y dice dónde es más barato"></p>
