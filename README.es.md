@@ -41,6 +41,16 @@ Medición real: una búsqueda en Wikipedia de 7 pasos gastó **≈ 2.540 tokens*
 
 ## Inicio rápido
 
+**En una línea (Claude Code):**
+
+```bash
+claude mcp add agentic-browser -- npx -y agentic-browser-mcp
+```
+
+En cualquier otro cliente MCP: `"command": "npx", "args": ["-y", "agentic-browser-mcp"]`. Requisitos: Node ≥ 18 y Chrome (o Edge).
+
+### Desde el código fuente
+
 Requisitos: Node ≥ 18 y Google Chrome.
 
 ```bash

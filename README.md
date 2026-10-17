@@ -39,6 +39,16 @@ Humans browse the web with browsers. Agents usually need APIs. agentic-browser l
 
 ## Quick start
 
+**One line (Claude Code):**
+
+```bash
+claude mcp add agentic-browser -- npx -y agentic-browser-mcp
+```
+
+Any other MCP client: use `"command": "npx", "args": ["-y", "agentic-browser-mcp"]`. Requirements: Node ≥ 18 and Chrome (or Edge).
+
+### From source
+
 Requirements: Node ≥ 18 and Google Chrome.
 
 ```bash

@@ -1,8 +1,11 @@
 {
   "mcpServers": {
     "agentic-browser": {
-      "command": "node",
-      "args": ["/absolute/path/to/agentic-browser/src/mcp.js"],
+      "command": "npx",
+      "args": [
+        "-y",
+        "agentic-browser-mcp"
+      ],
       "env": {
         "AGENT_CURSOR_SPEED": "120",
         "AGENT_TOOLS": "core"
