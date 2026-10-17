@@ -1,0 +1,19 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.davarion-tech/agentic-browser",
+  "description": "Give any AI agent your real Chrome: text perception, visible cursor, ~4x fewer tokens.",
+  "repository": {
+    "url": "https://github.com/davarion-tech/agentic-browser",
+    "source": "github"
+  },
+  "websiteUrl": "https://www.davarion.com",
+  "version": "1.0.1",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "agentic-browser-mcp",
+      "version": "1.0.1",
+      "transport": { "type": "stdio" }
+    }
+  ]
+}
