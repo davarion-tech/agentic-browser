@@ -33,14 +33,14 @@ export const overlayScript = String.raw`
       '@keyframes rp{from{transform:scale(1);opacity:1}to{transform:scale(4.5);opacity:0}}' +
       '@keyframes fd{0%{opacity:1}70%{opacity:1}100%{opacity:0}}' +
       'canvas{position:fixed;inset:0}' +
-      '.hud{position:fixed;right:16px;bottom:16px;min-width:236px;padding:12px 14px;border-radius:14px;' +
-      '  background:rgba(12,12,18,.86);backdrop-filter:blur(8px);color:#fff;font:500 12px/1.35 system-ui,sans-serif;' +
-      '  box-shadow:0 10px 30px rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.12);border-left:3px solid ' + COLOR + '}' +
-      '.hk{font-size:10px;letter-spacing:.08em;text-transform:uppercase;opacity:.6;margin-bottom:2px}' +
-      '.hr{display:flex;align-items:baseline;gap:8px;margin-bottom:8px}' +
-      '.hx{font-size:30px;font-weight:800;color:' + COLOR + ';font-variant-numeric:tabular-nums}' +
-      '.hg{display:grid;grid-template-columns:1fr auto;gap:2px 16px}.hg span{opacity:.65}' +
-      '.hg b{text-align:right;font-variant-numeric:tabular-nums}' +
+      // HUD compacto: una píldora en una esquina inferior que se aparta si el cursor se acerca
+      '.hud{position:fixed;bottom:12px;right:12px;display:flex;align-items:center;gap:10px;padding:6px 12px 6px 10px;' +
+      '  border-radius:999px;background:rgba(12,12,18,.82);backdrop-filter:blur(6px);color:#fff;' +
+      '  font:500 11px/1.2 system-ui,sans-serif;box-shadow:0 4px 14px rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.12);' +
+      '  transition:left .35s ease,right .35s ease,opacity .25s}' +
+      '.hud.l{right:auto;left:12px}' +
+      '.hx{font-size:18px;font-weight:800;color:' + COLOR + ';font-variant-numeric:tabular-nums}' +
+      '.hg{opacity:.75;font-variant-numeric:tabular-nums;white-space:nowrap}' +
       '.rec{display:inline-block;width:10px;height:10px;border-radius:50%;background:' + COLOR + ';margin-right:8px;animation:pu 1s infinite}' +
       '@keyframes pu{0%,100%{opacity:1}50%{opacity:.2}}';
     // Hoja construible: no cuenta como estilo en línea para la CSP de la página
@@ -66,7 +66,18 @@ export const overlayScript = String.raw`
   }
 
   // Contador de tokens en vivo (browser_cursor_style hud:true o AGENT_HUD=1)
-  let hudEl = null, lastHud = null;
+  let hudEl = null, lastHud = null, hudLeft = false;
+  // Si el cursor del agente entra en la zona del HUD, el HUD cambia de esquina
+  let lastDodge = 0;
+  function dodge(x, y) {
+    if (!hudEl || performance.now() - lastDodge < 800) return; // no rebotar durante la transición
+    const r = hudEl.getBoundingClientRect(), m = 90;
+    if (x > r.left - m && x < r.right + m && y > r.top - m && y < r.bottom + m) {
+      lastDodge = performance.now();
+      hudLeft = !hudLeft;
+      hudEl.classList.toggle('l', hudLeft);
+    }
+  }
   const shown = { ratio: 0, used: 0, shots: 0, calls: 0 };
   const fmt = n => Math.round(n).toLocaleString('en-US');
   function drawHud() {
@@ -76,13 +87,12 @@ export const overlayScript = String.raw`
       const mk = (tag, cls, text, parent) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text) e.textContent = text; parent.appendChild(e); return e; };
       hudEl = document.createElement('div');
       hudEl.className = 'hud';
-      mk('div', 'hk', 'agentic-browser · live tokens', hudEl);
-      const hr = mk('div', 'hr', '', hudEl);
-      mk('b', 'hx', '–', hr); mk('span', '', 'fewer tokens than screenshots', hr);
+      mk('b', 'hx', '–', hudEl);
       const hg = mk('div', 'hg', '', hudEl);
-      mk('span', '', 'tokens used', hg); mk('b', 'hu', '0', hg);
-      mk('span', '', 'with screenshots ≈', hg); mk('b', 'hs', '0', hg);
-      mk('span', '', 'tool calls', hg); mk('b', 'hc', '0', hg);
+      mk('div', '', 'fewer tokens than screenshots', hg);
+      const nums = mk('div', '', '', hg);
+      mk('b', 'hu', '0', nums); nums.append(' vs '); mk('b', 'hs', '0', nums); nums.append(' · '); mk('b', 'hc', '0', nums); nums.append(' calls');
+      if (hudLeft) hudEl.classList.add('l');
       root.appendChild(hudEl);
     }
     const from = { ...shown }, to = lastHud, t0 = performance.now(), el = hudEl;
@@ -162,6 +172,7 @@ export const overlayScript = String.raw`
     pos = { x, y };
     trail.push({ x, y, t: performance.now() });
     place();
+    dodge(x, y);
   }
 
   let lastRipple = { x: 0, y: 0, t: 0 };

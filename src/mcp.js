@@ -11,7 +11,7 @@ const ab = new AgentBrowser();
 // Instrucciones que el cliente MCP entrega al agente al conectarse
 const INSTRUCTIONS = `agentic-browser controla un Chrome real del agente (perfil propio, separado del navegador personal del usuario) y un humano puede ver un cursor rojo con cada acción.
 
-Cómo percibir: usa browser_snapshot (texto con refs y coordenadas) y browser_snapshot con diff:true tras cada acción. Evita browser_screenshot salvo contenido puramente visual. Para tablas y listas (productos, resultados, contactos) usa browser_extract, que devuelve filas JSON o CSV en una llamada.
+Cómo percibir: usa browser_snapshot (texto con refs y coordenadas) y browser_snapshot con diff:true tras cada acción. Evita browser_screenshot salvo contenido puramente visual. Para tablas y listas (productos, resultados, contactos) usa browser_extract, que devuelve filas JSON o CSV en una llamada. Si ya sabes los siguientes pasos, envíalos juntos con browser_batch: cada turno que ahorras es tiempo para el usuario.
 
 Tareas repetidas: si el usuario va a repetir una tarea, ofrécele el modo enseñar (browser_teach_start; la persona la hace una vez y pulsa "Terminar"; luego browser_teach_stop). Antes de repetir una tarea, mira browser_recipes y usa browser_replay con params nuevos en lugar de percibir cada paso. Las contraseñas nunca se graban: al repetir, las escribe la persona.
 

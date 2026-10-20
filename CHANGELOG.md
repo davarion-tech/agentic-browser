@@ -13,6 +13,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Live token counter: `browser_cursor_style({ hud: true })` or `AGENT_HUD=1` draws a corner panel with tokens used, the screenshot equivalent and the ratio. `browser_stats` returns the same numbers.
 - `browser_extract` joins the `core` tool set (13 tools).
 - `AGENT_VIEWPORT` to fix the page size (for example `1280x800`).
+- `browser_batch` runs up to 30 actions in one call, in order, and stops at the first error.
+- `AGENT_SPEED=fast|normal|demo` presets for cursor travel, typing delay and settle time.
+- `browser_type` keeps the focused field on screen before and after typing, so the person watching sees the text appear.
+- The token HUD is now a compact pill that switches to the other bottom corner when the agent's cursor comes near.
 
 ### Fixed
 - The cursor, banners and HUD did not render on sites that enforce Trusted Types (Google Docs, Gmail, YouTube). The overlay no longer uses `innerHTML`.

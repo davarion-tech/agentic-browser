@@ -143,6 +143,7 @@ Funciona con tu suscripción de Claude (`claude setup-token`) o con una API key.
 | `browser_teach_start` / `browser_teach_stop` | Graba una tarea que la persona hace una vez, como receta reutilizable |
 | `browser_recipes` / `browser_replay` | Lista o muestra recetas; repite una con `params` nuevos casi sin gastar tokens |
 | `browser_stats` | Tokens usados en la sesión frente al equivalente en capturas |
+| `browser_batch` | Varias acciones en una sola llamada, en orden, deteniéndose en el primer error. Ahorra un turno del agente por acción |
 | `browser_wait` / `browser_watch` | Esperar tiempo, un texto o un selector. `browser_watch` espera con **cero tokens** hasta que la página cambia (mensaje nuevo, título "(3) Bandeja"…) |
 | `browser_request_human` | Pasa el control a la persona que mira (login, 2FA, CAPTCHA, una decisión) con un banner en la página |
 | `browser_console` / `browser_events` / `browser_trace` | Consola y errores JS; diálogos, descargas y pestañas nuevas; registro de auditoría de cada acción |
@@ -160,7 +161,8 @@ Funciona con tu suscripción de Claude (`claude setup-token`) o con una API key.
 | `AGENT_CDP_URL` | — | Adjuntarse a un Chrome ya abierto con `--remote-debugging-port=9222 --user-data-dir=…` |
 | `AGENT_PROFILE` | `~/.agentic-browser/profile` | Perfil persistente del agente (cookies y sesiones sobreviven entre reinicios) |
 | `AGENT_DOWNLOADS` | `~/.agentic-browser/downloads` | Carpeta de descargas |
-| `AGENT_CURSOR_SPEED` | `120` | ms por cada 100 px de recorrido; `0` = instantáneo |
+| `AGENT_SPEED` | `normal` | `fast` para el día a día (el cursor tarda como mucho 250 ms y escribe sin pausa entre teclas); `demo` para grabar (más lento y fácil de seguir) |
+| `AGENT_CURSOR_SPEED` | según `AGENT_SPEED` | ms por cada 100 px de recorrido; `0` = instantáneo |
 | `AGENT_VIEWPORT` | tamaño de la ventana | Con ventana, Chrome abre maximizado y la página usa el tamaño real de la ventana. `1280x800` lo fija (sin ventana siempre es 1280×800) |
 | `AGENT_TOOLS` | `all` | `core` (13 esenciales) o una lista separada por comas. Menos herramientas, menos tokens en el prompt |
 | `AGENT_HUD` | `0` | `1` muestra el contador de tokens desde el inicio |

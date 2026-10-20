@@ -25,6 +25,12 @@ export function findChrome() {
 }
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+// AGENT_SPEED: ritmo del cursor y de las pausas. fast = trabajo diario; demo = para grabar vídeos
+const SPEEDS = {
+  fast: { cursor: 35, minMove: 30, maxMove: 250, typeDelay: 0, settle: 100, scrollWait: 120 },
+  normal: { cursor: 120, minMove: 80, maxMove: 900, typeDelay: 15, settle: 120, scrollWait: 250 },
+  demo: { cursor: 220, minMove: 150, maxMove: 1400, typeDelay: 35, settle: 200, scrollWait: 400 },
+};
 const ease = t => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
 export class AgentBrowser {
@@ -35,7 +41,7 @@ export class AgentBrowser {
       userDataDir: process.env.AGENT_PROFILE || path.join(os.homedir(), '.agentic-browser', 'profile'),
       downloadsDir: process.env.AGENT_DOWNLOADS || path.join(os.homedir(), '.agentic-browser', 'downloads'),
       // ms por cada 100 px de recorrido del cursor; 0 = teletransporte
-      cursorSpeed: Number(process.env.AGENT_CURSOR_SPEED ?? 120),
+      cursorSpeed: null,
       dialogs: process.env.AGENT_DIALOGS || 'accept',
       viewport: null,
       ...opts,
@@ -48,6 +54,8 @@ export class AgentBrowser {
       this.opts.viewport = m ? { width: +m[1], height: +m[2] } : this.opts.headless ? { width: 1280, height: 800 } : null;
     }
     this.lastViewport = this.opts.viewport;
+    this.speed = SPEEDS[process.env.AGENT_SPEED] || SPEEDS.normal;
+    if (this.opts.cursorSpeed == null) this.opts.cursorSpeed = Number(process.env.AGENT_CURSOR_SPEED ?? this.speed.cursor);
     this.context = null;
     this.page = null;
     this.cursor = new WeakMap();     // page -> {x,y}
@@ -294,7 +302,7 @@ export class AgentBrowser {
   async moveTo(page, x, y) {
     const from = this.cursor.get(page) || { x: Math.round(this.opts.viewport?.width / 2 || 400), y: 40 };
     const dist = Math.hypot(x - from.x, y - from.y);
-    const total = this.opts.cursorSpeed > 0 ? Math.min(900, Math.max(80, (dist / 100) * this.opts.cursorSpeed)) : 0;
+    const total = this.opts.cursorSpeed > 0 ? Math.min(this.speed.maxMove * Math.max(1, this.opts.cursorSpeed / this.speed.cursor), Math.max(this.speed.minMove, (dist / 100) * this.opts.cursorSpeed)) : 0;
     const steps = total ? Math.max(4, Math.round(total / 16)) : 1;
     // Ligera curva (control perpendicular) para que el trayecto se lea a simple vista
     const mx = (from.x + x) / 2 + (y - from.y) * 0.12, my = (from.y + y) / 2 - (x - from.x) * 0.12;

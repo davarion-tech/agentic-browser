@@ -16,7 +16,8 @@ Do the user's web task **only** with the `browser_*` tools of the `agentic-brows
 5. **Wait without spending tokens.** Use `browser_watch` to wait for new text or a title change.
 6. **Hand over to the human** with `browser_request_human` for logins, 2FA, CAPTCHAs, or any decision. Never try to solve a CAPTCHA.
 7. **Repeated tasks.** If the user will repeat a task, offer teach mode: `browser_teach_start`, the user does it once and presses "Terminar", then `browser_teach_stop`. Next time, check `browser_recipes` and use `browser_replay` with new `params` instead of perceiving every step.
-8. **Show the savings.** If the user is watching or recording a demo, `browser_cursor_style({ hud: true })` shows a live token counter; `browser_stats` returns the numbers.
+8. **Fewer turns.** When you already know the next few steps, send them together with `browser_batch` (it stops at the first error).
+9. **Show the savings.** If the user is watching or recording a demo, `browser_cursor_style({ hud: true })` shows a live token counter; `browser_stats` returns the numbers.
 
 ## Before acting on accounts
 

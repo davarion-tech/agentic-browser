@@ -56,9 +56,10 @@ export function createTools(ab) {
   // Captura = ancho × alto / 750 tokens (la fórmula de imágenes de Claude): 1280×800 ≈ 1.365.
   const meter = { calls: 0, used: 0, shots: 0, perceptions: 0 };
   let replaySteps = 0;
+  let wrappedRef = []; // herramientas envueltas, para browser_batch
 
   async function settle(page, before) {
-    await sleep(120);
+    await sleep(ab.speed.settle);
     if (page.url() !== before) await page.waitForLoadState('domcontentloaded', { timeout: 8000 }).catch(() => {});
   }
 
@@ -194,10 +195,10 @@ export function createTools(ab) {
         text: z.string(), ref, x, y,
         clear: z.boolean().optional().describe('Borra el contenido antes de escribir'),
         submit: z.boolean().optional().describe('Pulsa Enter al final'),
-        delay: z.number().optional().describe('ms entre teclas (15)'),
+        delay: z.number().optional().describe('ms entre teclas (15; 0 con AGENT_SPEED=fast)'),
         snapshot: snap,
       },
-      async run({ text, clear, submit, delay = 15, snapshot, ...t }) {
+      async run({ text, clear, submit, delay, snapshot, ...t }) {
         const page = await ab.active(); const u = page.url();
         let where = 'elemento enfocado';
         if (t.ref !== undefined || (t.x !== undefined && t.y !== undefined)) {
@@ -209,7 +210,12 @@ export function createTools(ab) {
         }
         if (clear) { await page.keyboard.press(isMac ? 'Meta+A' : 'Control+A'); await page.keyboard.press('Backspace'); }
         ab.markAction();
-        await page.keyboard.type(text, { delay });
+        // Quien mira debe ver lo que se escribe: el campo enfocado entra en pantalla antes y después
+        const follow = () => page.evaluate(() => { const a = document.activeElement;
+          if (a && a !== document.body && a.tagName !== 'IFRAME') a.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }).catch(() => {});
+        await follow();
+        await page.keyboard.type(text, { delay: delay ?? ab.speed.typeDelay });
+        await follow();
         if (submit) { ab.markAction(); await page.keyboard.press('Enter'); }
         return after(page, u, `ok escrito ${text.length} chars en ${where}${submit ? ' + Enter' : ''}`, snapshot);
       },
@@ -235,7 +241,7 @@ export function createTools(ab) {
         const px = t.x ?? ab.cursor.get(page)?.x ?? vp.width / 2, py = t.y ?? ab.cursor.get(page)?.y ?? vp.height / 2;
         await ab.moveTo(page, px, py);
         await page.mouse.wheel(dx, dy);
-        await sleep(250);
+        await sleep(ab.speed.scrollWait);
         const s = await page.evaluate(() => [scrollX, scrollY, document.documentElement.scrollHeight]);
         return after(page, page.url(), `ok scroll → ${s[0]},${s[1]} de ${s[2]}`, snapshot);
       },
@@ -530,6 +536,33 @@ export function createTools(ab) {
       async run() { return JSON.stringify(await recorder.stop()); },
     },
     {
+      name: 'browser_batch',
+      description: 'Varias acciones en UNA llamada (ahorra un turno del agente por acción): [{tool:"browser_click", args:{ref:12}}, {tool:"browser_type", args:{ref:14, text:"hola", submit:true}}]. Se ejecutan en orden y se detiene en el primer error. Úsala cuando ya sabes los pasos siguientes; con snapshot:true devuelve el estado final.',
+      schema: {
+        actions: z.array(z.object({ tool: z.string(), args: z.record(z.string(), z.any()).optional() })).min(1).max(30),
+        snapshot: snap,
+      },
+      async run({ actions, snapshot }) {
+        const lines = [];
+        let done = 0;
+        for (const [i, a] of actions.entries()) {
+          const name = a.tool.startsWith('browser_') ? a.tool : 'browser_' + a.tool;
+          const t = wrappedRef.find(w => w.name === name);
+          if (!t || /^browser_(batch|teach_|request_human|record_|screenshot)/.test(name)) {
+            lines.push(`✗ ${i + 1} ${name}: no se puede usar dentro de browser_batch`); break;
+          }
+          try {
+            const out = String(await t.run(a.args || {}));
+            done++;
+            lines.push(`✓ ${i + 1} ${name}: ${out.split('\n').slice(0, 3).join(' | ').slice(0, 300)}`);
+          } catch (e) { lines.push(`✗ ${i + 1} ${name}: ${e.message}`, 'Se detuvo aquí.'); break; }
+        }
+        lines.unshift(`batch: ${done}/${actions.length} acciones`);
+        if (snapshot) { const [, s] = await ab.snapshotWithPrev(); lines.push('', formatSnapshot(s)); }
+        return lines.join('\n');
+      },
+    },
+    {
       name: 'browser_screenshot',
       description: 'ÚLTIMO RECURSO (gasta tokens): imagen JPEG de la página o de un ref, para contenido puramente visual (canvas, gráficos, captchas no).',
       schema: { ref, fullPage: z.boolean().optional(), quality: z.number().optional() },
@@ -552,7 +585,7 @@ export function createTools(ab) {
       ratio: meter.used ? +(meter.shots / meter.used).toFixed(2) : 0, perceptions: meter.perceptions, tokensPerScreenshot: shotTokens() };
   }
   function count(name, args, out) {
-    if (name === 'browser_stats') return;
+    if (name === 'browser_stats' || name === 'browser_batch') return; // las acciones del lote ya cuentan una a una
     const shot = shotTokens();
     const used = out?.image ? shot : typeof out === 'string' ? estTokens(out) : 0;
     let perceptions = PERCEIVE.has(name) || args.snapshot ? 1 : 0;
@@ -596,6 +629,7 @@ export function createTools(ab) {
       }
     },
   }));
+  wrappedRef = wrapped;
   const only = process.env.AGENT_TOOLS;
   if (!only || only === 'all') return wrapped;
   const names = only === 'core' ? CORE : only.split(',').map(s => s.trim());

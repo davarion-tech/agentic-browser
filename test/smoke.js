@@ -161,6 +161,16 @@ const secret = await call('browser_teach_stop');
 console.log(secret);
 assert.match(secret, /— 2 pasos[\s\S]*1\. dato secreto en password "Clave" \(lo escribe la persona\)\n2\. tecla Enter/);
 assert.doesNotMatch(fs.readFileSync(secret.match(/guardada en (.+)$/m)[1], 'utf8'), /s3creta/);
+// browser_batch: varias acciones en una llamada, se detiene en el primer error
+const batch = await call('browser_batch', { actions: [
+  { tool: 'browser_type', args: { ref: (await call('browser_find', { query: 'Nombre' })).match(/\[(\d+)\] textbox/)[1], text: 'Eva', clear: true } },
+  { tool: 'click', args: { ref: (await call('browser_find', { query: 'Saludar' })).match(/\[(\d+)\] button/)[1] } },
+  { tool: 'browser_read', args: { selector: '#saludo' } },
+] });
+console.log(batch);
+assert.match(batch, /^batch: 3\/3 acciones/);
+assert.match(batch, /Hola, Eva/);
+assert.match(await call('browser_batch', { actions: [{ tool: 'browser_click', args: { ref: 99999 } }, { tool: 'browser_cursor' }] }), /^batch: 0\/2[\s\S]*✗ 1 browser_click/);
 await call('browser_cursor_style', { hud: false });
 assert.equal(await call('browser_eval', { expression: 'window.__agentCursor.state().hud' }), 'false');
 await call('browser_scroll', { dy: -5000 });

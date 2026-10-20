@@ -153,6 +153,7 @@ viewport 1280x800 scroll=0,0 docH=2090
 | `browser_teach_start` / `browser_teach_stop` | Record a task the person performs once, as a reusable recipe |
 | `browser_recipes` / `browser_replay` | List or show recipes; replay one with new `params` at almost zero tokens |
 | `browser_stats` | Tokens used this session vs. the screenshot equivalent |
+| `browser_batch` | Several actions in one call, in order, stopping at the first error. Saves one agent turn per action |
 | `browser_wait` / `browser_watch` | Wait for time, text or selector. `browser_watch` sleeps at **zero tokens** until the page changes (new message, title "(3) Inbox"…) |
 | `browser_request_human` | Hand control to the person watching (login, 2FA, CAPTCHA, a decision) through an on-page banner |
 | `browser_console` / `browser_events` / `browser_trace` | JS console and errors; dialogs, downloads and new tabs; audit trail of every action |
@@ -172,7 +173,8 @@ Most actions accept `snapshot: true` and return the new page state in the same r
 | `AGENT_CDP_URL` | — | Attach to a running Chrome started with `--remote-debugging-port=9222 --user-data-dir=…` |
 | `AGENT_PROFILE` | `~/.agentic-browser/profile` | Persistent agent profile (cookies and logins survive restarts) |
 | `AGENT_DOWNLOADS` | `~/.agentic-browser/downloads` | Download folder |
-| `AGENT_CURSOR_SPEED` | `120` | ms per 100 px of cursor travel; `0` = instant |
+| `AGENT_SPEED` | `normal` | `fast` for daily work (cursor moves ≤ 250 ms, no delay between keystrokes), `demo` for recordings (slower, easy to follow) |
+| `AGENT_CURSOR_SPEED` | from `AGENT_SPEED` | ms per 100 px of cursor travel; `0` = instant |
 | `AGENT_VIEWPORT` | window size | With a window, Chrome opens maximized and the page uses the real window size. `1280x800` fixes it (headless always uses 1280×800) |
 | `AGENT_TOOLS` | `all` | `core` (13 essential tools) or a comma-separated list. Fewer tools means fewer prompt tokens |
 | `AGENT_HUD` | `0` | `1` shows the live token counter from the start |
