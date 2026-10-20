@@ -14,7 +14,7 @@ const transport = new StdioClientTransport({
   command: process.execPath,
   args: [path.join(here, '..', 'src', 'mcp.js')],
   env: { ...process.env, AGENT_HEADLESS: process.env.AGENT_HEADLESS ?? '1',
-    AGENT_PROFILE: fs.mkdtempSync(path.join(os.tmpdir(), 'ab-')), AGENT_CURSOR_SPEED: '40' },
+    AGENT_PROFILE: fs.mkdtempSync(path.join(os.tmpdir(), 'ab-')), AGENT_CURSOR_SPEED: '40', AGENT_ALLOW_EVAL: '1' },
   stderr: 'inherit',
 });
 const client = new Client({ name: 'smoke', version: '1.0.0' });
@@ -24,7 +24,8 @@ const call = async (name, args = {}) => {
   const r = await client.callTool({ name, arguments: args });
   const c = r.content[0];
   if (r.isError) throw new Error(`${name}: ${c.text}`);
-  return c.type === 'text' ? c.text : c;
+  // El contenido de la web llega delimitado como no confiable; aquí solo interesa lo de dentro
+  return c.type === 'text' ? c.text.replace(/^<page_content[^>]*>\n([\s\S]*)\n<\/page_content>$/, '$1') : c;
 };
 const refOf = (snap, re) => { const l = snap.split('\n').find(l => re.test(l)); assert.ok(l, `no encuentro ${re} en:\n${snap}`); return l.match(/^\[([^\]]+)\]/)[1]; };
 

@@ -142,7 +142,7 @@ viewport 1280x800 scroll=0,0 docH=2090
 | `browser_scroll` / `browser_drag` | Mouse wheel; drag and drop |
 | `browser_select` / `browser_upload` | `<select>` options; file inputs |
 | `browser_navigate` / `browser_history` / `browser_tabs` | Navigation and tabs |
-| `browser_read` / `browser_eval` | Readable text (wrapped as untrusted content); arbitrary JS |
+| `browser_read` / `browser_eval` | Readable text (wrapped as untrusted content); arbitrary JS (only with `AGENT_ALLOW_EVAL=1`) |
 | `browser_wait` / `browser_watch` | Wait for time, text or selector. `browser_watch` sleeps at **zero tokens** until the page changes (new message, title "(3) Inbox"…) |
 | `browser_request_human` | Hand control to the person watching (login, 2FA, CAPTCHA, a decision) through an on-page banner |
 | `browser_console` / `browser_events` / `browser_trace` | JS console and errors; dialogs, downloads and new tabs; audit trail of every action |
@@ -166,10 +166,12 @@ Most actions accept `snapshot: true` and return the new page state in the same r
 | `AGENT_TOOLS` | `all` | `core` (12 essential tools) or a comma-separated list. Fewer tools means fewer prompt tokens |
 | `AGENT_READONLY` | `0` | `1` disables every tool that changes a page |
 | `AGENT_ALLOWED_ORIGINS` | — | Domain allowlist, e.g. `wikipedia.org,localhost` (subdomains included) |
-| `AGENT_DIALOGS` | `accept` | `alert/confirm/prompt`: `accept` or `dismiss` |
+| `AGENT_DIALOGS` | `dismiss` | `alert/confirm/prompt`: `dismiss` (default since 1.1.0: a `confirm("Delete?")` is never accepted on its own) or `accept`. The dialog text reaches the agent as an event |
 | `AGENT_TRACE` | `~/.agentic-browser/trace.jsonl` | Audit log of every tool call |
 | `AGENT_CHROME` | auto-detected | Path to the browser. Any Chromium browser works: Chrome, Edge (falls back to it automatically), Brave, Chromium |
-| `AGENT_HTTP_PORT` / `AGENT_TOKEN` | `8787` / — | HTTP port and optional Bearer token |
+| `AGENT_HTTP_PORT` / `AGENT_TOKEN` | `8787` / generated | HTTP port and **required** Bearer token. Without `AGENT_TOKEN`, one is generated in `~/.agentic-browser/http-token` (path configurable with `AGENT_TOKEN_FILE`). Requests coming from web pages are rejected |
+| `AGENT_ALLOW_EVAL` | `0` | `1` enables `browser_eval` (off by default: it can read cookies and exfiltrate data) |
+| `AGENT_UPLOAD_DIRS` | downloads folder | Folders `browser_upload` may upload from, separated by `;` on Windows and `:` on macOS/Linux |
 | `AGENT_RECORDINGS` | `~/.agentic-browser/recordings` | Where `browser_record_stop` saves videos |
 | `AGENT_FFMPEG` | `ffmpeg` | Path to ffmpeg for MP4 recordings; `none` forces the WebM fallback |
 

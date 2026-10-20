@@ -401,6 +401,11 @@ export class ChatWatcher {
     await this.btools.get('browser_click').run({ ref: a.box_ref });
     const blocked = await this.guardOrigin(ch, page);
     if (blocked) return blocked;
+    const secret = await this.ab.focusSensitive(page);
+    if (secret) {
+      this.log({ type: 'blocked', channel: ch.name, contact: a.contact, detail: `box_ref es un campo sensible (${secret})` });
+      return `no se escribió: box_ref apunta a un campo sensible (${secret}), no a la caja de mensajes.`;
+    }
     await page.keyboard.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
     await page.keyboard.press('Backspace');
     // Multilínea con Shift+Enter: nunca un Enter suelto que envíe sin pasar la política

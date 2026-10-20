@@ -36,7 +36,8 @@ export class AgentBrowser {
       downloadsDir: process.env.AGENT_DOWNLOADS || path.join(os.homedir(), '.agentic-browser', 'downloads'),
       // ms por cada 100 px de recorrido del cursor; 0 = teletransporte
       cursorSpeed: Number(process.env.AGENT_CURSOR_SPEED ?? 120),
-      dialogs: process.env.AGENT_DIALOGS || 'accept',
+      // Por defecto se CANCELAN (un confirm("¿Borrar?") nunca se acepta solo); el texto llega al agente en los eventos
+      dialogs: process.env.AGENT_DIALOGS || 'dismiss',
       viewport: { width: 1280, height: 800 },
       ...opts,
     };
@@ -369,6 +370,17 @@ export class AgentBrowser {
       if (r.reason !== 'timeout') return r;
     }
     return { reason: 'timeout' };
+  }
+
+  // Nombre del campo sensible enfocado (contraseña, código 2FA, tarjeta...) en cualquier frame, o null
+  async focusSensitive(page) {
+    for (const f of page.frames()) {
+      if (f.isDetached()) continue;
+      await this.ensure(f);
+      const hit = await f.evaluate(() => window.__agentPerc?.focusSensitive()).catch(() => null);
+      if (hit) return hit;
+    }
+    return null;
   }
 
   drainEvents() { const e = this.events; this.events = []; return e; }

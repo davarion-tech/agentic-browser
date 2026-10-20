@@ -98,19 +98,44 @@ export const perceptionScript = String.raw`
       w: Math.round(r.width), h: Math.round(r.height) };
     meta.set(d.ref, { role: d.role, name: d.name });
     if ('value' in el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) && !/^(password|checkbox|radio)$/.test(el.type)) d.value = clean(String(el.value), 60);
-    if (el.tagName === 'INPUT' && el.type === 'password') d.value = el.value ? '••••' : '';
+    const secret = sensitive(el);
+    if (secret) d.value = el.value ? '••••' : '';
     if (el.placeholder) d.placeholder = clean(el.placeholder, 40);
     if (el.tagName === 'A' && el.href) d.href = clean(el.getAttribute('href'), 80);
     if (el.tagName === 'SELECT') d.options = [...el.options].slice(0, 15).map(o => (o.selected ? '*' : '') + clean(o.text, 30));
     const st = state(el);
     if (occluded(el, r)) st.push('occluded');
+    if (secret) st.push('sensitive');
     if (st.length) d.state = st;
     return d;
   }
 
   function inView(r) { return r.bottom > 0 && r.right > 0 && r.top < innerHeight && r.left < innerWidth; }
 
-  window.__agentPerc = {
+  // Campos donde el agente NUNCA escribe: contraseñas, códigos 2FA, tarjetas, cuentas.
+  // Los rellena la persona (browser_request_human).
+  const SENSITIVE_AC = /\b(current-password|new-password|one-time-code|cc-number|cc-csc|cc-exp(-month|-year)?)\b/i;
+  const SENSITIVE_NAME = /pass(word|wd|code|phrase)|\bpwd\b|contrase|\botp\b|one.?time|2fa|mfa|verification.?code|c[oó]digo de (verificaci|seguridad|acceso)|\bcvv\b|\bcvc\b|security.?code|\bssn\b|social.?security|routing.?(number|no)|account.?(number|no\b)|card.?number|n[uú]mero de (tarjeta|cuenta)|\bpin\b/i;
+  function sensitive(el) {
+    if (!el || el.nodeType !== 1) return false;
+    if (el.tagName === 'INPUT' && (el.type || '').toLowerCase() === 'password') return true;
+    if (SENSITIVE_AC.test(el.getAttribute('autocomplete') || '')) return true;
+    if (!/^(INPUT|TEXTAREA)$/.test(el.tagName) && !el.isContentEditable) return false;
+    const hint = ['name', 'id', 'aria-label', 'placeholder', 'title'].map(a => el.getAttribute(a) || '').join(' ') +
+      ' ' + (el.labels && el.labels[0] ? el.labels[0].innerText : '');
+    return SENSITIVE_NAME.test(hint);
+  }
+  // Elemento enfocado atravesando shadow roots
+  function deepActive() {
+    let a = document.activeElement;
+    while (a && a.shadowRoot && a.shadowRoot.activeElement) a = a.shadowRoot.activeElement;
+    return a;
+  }
+
+  const api = {
+    // ¿El foco está en un campo sensible? Los iframes se comprueban por separado desde Node.
+    focusSensitive() { const a = deepActive(); return a && a.tagName !== 'IFRAME' && sensitive(a) ? (a.getAttribute('name') || a.id || a.type || a.tagName.toLowerCase()) : null; },
+
     snapshot({ ox = 0, oy = 0, viewportOnly = true, includeText = false, max = 250 } = {}) {
       const sel = INTERACTIVE + ',' + LANDMARK;
       const items = [];
@@ -208,7 +233,7 @@ export const perceptionScript = String.raw`
     rect(ref, ox = 0, oy = 0) {
       let el = refs.get(ref);
       let relocated = false;
-      if (!el || !el.isConnected) { el = this.relocate(ref); relocated = !!el; }
+      if (!el || !el.isConnected) { el = api.relocate(ref); relocated = !!el; }
       if (!el) return null;
       el.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
       const r = el.getBoundingClientRect();
@@ -217,7 +242,9 @@ export const perceptionScript = String.raw`
         occluded: occluded(el, r) };
     },
   };
-  Object.defineProperty(window, '__agentPerc', { enumerable: false });
+  // Bloqueado: la página no puede sustituirlo por uno falso (corre antes que sus scripts)
+  Object.freeze(api);
+  Object.defineProperty(window, '__agentPerc', { value: api, enumerable: false, writable: false, configurable: false });
 })();
 `;
 

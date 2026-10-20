@@ -132,7 +132,7 @@ Funciona con tu suscripción de Claude (`claude setup-token`) o con una API key.
 | `browser_scroll` / `browser_drag` | Rueda del ratón; arrastrar y soltar |
 | `browser_select` / `browser_upload` | Opciones de `<select>`; subida de archivos |
 | `browser_navigate` / `browser_history` / `browser_tabs` | Navegación y pestañas |
-| `browser_read` / `browser_eval` | Texto legible (marcado como contenido no confiable); JS arbitrario |
+| `browser_read` / `browser_eval` | Texto legible (marcado como contenido no confiable); JS arbitrario (solo con `AGENT_ALLOW_EVAL=1`) |
 | `browser_wait` / `browser_watch` | Esperar tiempo, un texto o un selector. `browser_watch` espera con **cero tokens** hasta que la página cambia (mensaje nuevo, título "(3) Bandeja"…) |
 | `browser_request_human` | Pasa el control a la persona que mira (login, 2FA, CAPTCHA, una decisión) con un banner en la página |
 | `browser_console` / `browser_events` / `browser_trace` | Consola y errores JS; diálogos, descargas y pestañas nuevas; registro de auditoría de cada acción |
@@ -154,10 +154,12 @@ Funciona con tu suscripción de Claude (`claude setup-token`) o con una API key.
 | `AGENT_TOOLS` | `all` | `core` (12 esenciales) o una lista separada por comas. Menos herramientas, menos tokens en el prompt |
 | `AGENT_READONLY` | `0` | `1` desactiva toda herramienta que modifique la página |
 | `AGENT_ALLOWED_ORIGINS` | — | Lista blanca de dominios, p. ej. `wikipedia.org,localhost` (incluye subdominios) |
-| `AGENT_DIALOGS` | `accept` | `alert/confirm/prompt`: `accept` o `dismiss` |
+| `AGENT_DIALOGS` | `dismiss` | `alert/confirm/prompt`: `dismiss` (por defecto desde 1.1.0: un `confirm("¿Borrar?")` nunca se acepta solo) o `accept`. El texto del diálogo llega al agente en los eventos |
 | `AGENT_TRACE` | `~/.agentic-browser/trace.jsonl` | Registro de auditoría de cada llamada |
 | `AGENT_CHROME` | autodetectado | Ruta al navegador. Sirve cualquier Chromium: Chrome, Edge (se usa solo si no hay Chrome), Brave, Chromium |
-| `AGENT_HTTP_PORT` / `AGENT_TOKEN` | `8787` / — | Puerto HTTP y token Bearer opcional |
+| `AGENT_HTTP_PORT` / `AGENT_TOKEN` | `8787` / generado | Puerto HTTP y token Bearer **obligatorio**. Sin `AGENT_TOKEN` se genera uno en `~/.agentic-browser/http-token` (ruta cambiable con `AGENT_TOKEN_FILE`). Se rechazan las peticiones que vienen de páginas web |
+| `AGENT_ALLOW_EVAL` | `0` | `1` activa `browser_eval` (desactivada por defecto: puede leer cookies y sacar datos) |
+| `AGENT_UPLOAD_DIRS` | carpeta de descargas | Carpetas desde las que `browser_upload` puede subir archivos, separadas por `;` en Windows y `:` en macOS/Linux |
 | `AGENT_RECORDINGS` | `~/.agentic-browser/recordings` | Carpeta donde `browser_record_stop` guarda los vídeos |
 | `AGENT_FFMPEG` | `ffmpeg` | Ruta a ffmpeg para grabar en MP4; `none` fuerza el WebM sin dependencias |
 

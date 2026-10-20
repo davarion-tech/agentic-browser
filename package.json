@@ -1,12 +1,13 @@
 {
   "name": "agentic-browser-mcp",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Agentic browser on top of your real Chrome: MCP + HTTP API, token-cheap text perception with pixel coordinates, and a visible agent cursor",
   "main": "src/mcp.js",
   "scripts": {
     "mcp": "node src/mcp.js",
     "http": "node src/http.js",
-    "test": "node test/smoke.js",
+    "test": "node test/smoke.js && node test/security.test.js",
+    "test:security": "node test/security.test.js",
     "doctor": "node src/doctor.js",
     "watcher": "node src/watcher.js",
     "test:watcher": "node test/watcher.test.js",

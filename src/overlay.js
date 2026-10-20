@@ -147,18 +147,21 @@ export const overlayScript = String.raw`
     root.appendChild(bar);
     let resolve; const promise = new Promise(r => (resolve = r));
     const done = v => { bar.remove(); pendingAsk = null; resolve(v); };
-    ok.onclick = () => done('done'); no.onclick = () => done('cancel');
+    // Solo clics reales de una persona; la página no puede resolverlo con dispatchEvent
+    ok.onclick = e => { if (e.isTrusted) done('done'); };
+    no.onclick = e => { if (e.isTrusted) done('cancel'); };
     pendingAsk = { promise };
     return promise;
   }
 
-  window.__agentCursor = {
+  const api = Object.freeze({
     move, ripple, say, highlight, ask,
     get: () => ({ ...pos }),
     trail: on => (enabled.trail = !!on),
     hide: () => host && (host.style.display = 'none'),
     show: () => host && (host.style.display = ''),
-  };
-  Object.defineProperty(window, '__agentCursor', { enumerable: false });
+  });
+  // Bloqueado: la página no puede sustituirlo (p. ej. un ask() falso que responda "done")
+  Object.defineProperty(window, '__agentCursor', { value: api, enumerable: false, writable: false, configurable: false });
 })();
 `;
