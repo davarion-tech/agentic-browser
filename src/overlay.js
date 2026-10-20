@@ -152,7 +152,7 @@ export const overlayScript = String.raw`
     b.style.cssText = 'position:fixed;left:0;top:50%;transform:translateY(-50%);pointer-events:auto;cursor:pointer;' +
       'display:flex;align-items:center;gap:8px;height:40px;padding:0 10px 0 12px;border-radius:0 20px 20px 0;' +
       'background:rgba(17,24,39,.78);color:#fff;font:600 12px system-ui,sans-serif;box-shadow:0 4px 14px rgba(0,0,0,.3);' +
-      'max-width:34px;overflow:hidden;white-space:nowrap;transition:max-width .25s ease,background .2s';
+      'box-sizing:border-box;max-width:34px;overflow:hidden;white-space:nowrap;transition:max-width .25s ease,background .2s';
     const dot = document.createElement('span');
     dot.style.cssText = 'flex:none;width:11px;height:11px;border-radius:50%;background:' + COLOR;
     b.append(dot, 'Enseñar una tarea');
