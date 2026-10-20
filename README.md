@@ -173,6 +173,7 @@ Most actions accept `snapshot: true` and return the new page state in the same r
 | `AGENT_PROFILE` | `~/.agentic-browser/profile` | Persistent agent profile (cookies and logins survive restarts) |
 | `AGENT_DOWNLOADS` | `~/.agentic-browser/downloads` | Download folder |
 | `AGENT_CURSOR_SPEED` | `120` | ms per 100 px of cursor travel; `0` = instant |
+| `AGENT_VIEWPORT` | window size | With a window, Chrome opens maximized and the page uses the real window size. `1280x800` fixes it (headless always uses 1280×800) |
 | `AGENT_TOOLS` | `all` | `core` (13 essential tools) or a comma-separated list. Fewer tools means fewer prompt tokens |
 | `AGENT_HUD` | `0` | `1` shows the live token counter from the start |
 | `AGENT_RECIPES` | `~/.agentic-browser/recipes` | Where taught recipes are saved (JSON) |

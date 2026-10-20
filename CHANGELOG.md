@@ -12,6 +12,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - `browser_extract` returns the most relevant table or repeated list as JSON or CSV rows (title, url, price, image, text for lists; one column per header for tables, with rowspan/colspan and footnote marks resolved). It can save to disk (`file`, `AGENT_EXPORTS`). CSV output escapes quotes and neutralizes spreadsheet formulas.
 - Live token counter: `browser_cursor_style({ hud: true })` or `AGENT_HUD=1` draws a corner panel with tokens used, the screenshot equivalent and the ratio. `browser_stats` returns the same numbers.
 - `browser_extract` joins the `core` tool set (13 tools).
+- `AGENT_VIEWPORT` to fix the page size (for example `1280x800`).
+
+### Fixed
+- The cursor, banners and HUD did not render on sites that enforce Trusted Types (Google Docs, Gmail, YouTube). The overlay no longer uses `innerHTML`.
+- With a visible window, the browser no longer overflows small or scaled screens: Chrome opens maximized and the page follows the real window size instead of a fixed 1280×800.
 
 ## [1.0.1] - 2026-10-16
 

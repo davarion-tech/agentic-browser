@@ -18,8 +18,8 @@ export const overlayScript = String.raw`
     host = document.createElement('agent-cursor-host');
     host.style.cssText = 'all:initial;position:fixed;inset:0;pointer-events:none;z-index:2147483647;';
     root = host.attachShadow({ mode: 'closed' });
-    root.innerHTML = '<style>' +
-      ':host{all:initial}' +
+    // Sin innerHTML: las webs con Trusted Types (Google Docs, Gmail, YouTube…) lo bloquean
+    const css = ':host{all:initial}' +
       '.c{position:fixed;left:0;top:0;width:26px;height:26px;transform:translate(-100px,-100px);' +
       '  transition:transform 60ms linear;filter:drop-shadow(0 1px 2px rgba(0,0,0,.45));will-change:transform}' +
       '.l{position:fixed;left:0;top:0;transform:translate(-100px,-100px);font:600 11px/1.2 system-ui,sans-serif;' +
@@ -42,15 +42,22 @@ export const overlayScript = String.raw`
       '.hg{display:grid;grid-template-columns:1fr auto;gap:2px 16px}.hg span{opacity:.65}' +
       '.hg b{text-align:right;font-variant-numeric:tabular-nums}' +
       '.rec{display:inline-block;width:10px;height:10px;border-radius:50%;background:' + COLOR + ';margin-right:8px;animation:pu 1s infinite}' +
-      '@keyframes pu{0%,100%{opacity:1}50%{opacity:.2}}' +
-      '</style>' +
-      '<canvas></canvas>' +
-      '<svg class="c" viewBox="0 0 26 26"><path d="M3 2 L3 21 L8.5 16 L12 24 L15.5 22.5 L12 15 L19.5 15 Z" ' +
-      'fill="' + COLOR + '" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg>' +
-      '<div class="l"></div>';
-    cursor = root.querySelector('.c');
-    label = root.querySelector('.l');
-    trailCanvas = root.querySelector('canvas');
+      '@keyframes pu{0%,100%{opacity:1}50%{opacity:.2}}';
+    // Hoja construible: no cuenta como estilo en línea para la CSP de la página
+    try { const sh = new CSSStyleSheet(); sh.replaceSync(css); root.adoptedStyleSheets = [sh]; }
+    catch { const st = document.createElement('style'); st.textContent = css; root.appendChild(st); }
+    trailCanvas = document.createElement('canvas');
+    const NS = 'http://www.w3.org/2000/svg';
+    cursor = document.createElementNS(NS, 'svg');
+    cursor.setAttribute('class', 'c');
+    cursor.setAttribute('viewBox', '0 0 26 26');
+    const arrow = document.createElementNS(NS, 'path');
+    const attrs = { d: 'M3 2 L3 21 L8.5 16 L12 24 L15.5 22.5 L12 15 L19.5 15 Z', fill: COLOR, stroke: '#fff', 'stroke-width': '1.6', 'stroke-linejoin': 'round' };
+    for (const k in attrs) arrow.setAttribute(k, attrs[k]);
+    cursor.appendChild(arrow);
+    label = document.createElement('div');
+    label.className = 'l';
+    root.append(trailCanvas, cursor, label);
     ctx = trailCanvas.getContext('2d');
     resize();
     (document.documentElement || document).appendChild(host);
@@ -66,12 +73,16 @@ export const overlayScript = String.raw`
     if (!root) return;
     if (!lastHud) { if (hudEl) hudEl.remove(); hudEl = null; return; }
     if (!hudEl) {
+      const mk = (tag, cls, text, parent) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text) e.textContent = text; parent.appendChild(e); return e; };
       hudEl = document.createElement('div');
       hudEl.className = 'hud';
-      hudEl.innerHTML = '<div class="hk">agentic-browser · live tokens</div>' +
-        '<div class="hr"><b class="hx">–</b><span>fewer tokens than screenshots</span></div>' +
-        '<div class="hg"><span>tokens used</span><b class="hu">0</b><span>with screenshots ≈</span><b class="hs">0</b>' +
-        '<span>tool calls</span><b class="hc">0</b></div>';
+      mk('div', 'hk', 'agentic-browser · live tokens', hudEl);
+      const hr = mk('div', 'hr', '', hudEl);
+      mk('b', 'hx', '–', hr); mk('span', '', 'fewer tokens than screenshots', hr);
+      const hg = mk('div', 'hg', '', hudEl);
+      mk('span', '', 'tokens used', hg); mk('b', 'hu', '0', hg);
+      mk('span', '', 'with screenshots ≈', hg); mk('b', 'hs', '0', hg);
+      mk('span', '', 'tool calls', hg); mk('b', 'hc', '0', hg);
       root.appendChild(hudEl);
     }
     const from = { ...shown }, to = lastHud, t0 = performance.now(), el = hudEl;
@@ -100,8 +111,9 @@ export const overlayScript = String.raw`
       'background:#111827;color:#fff;font:500 14px/1.35 system-ui,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.35);border:2px solid ' + COLOR;
     const msg = document.createElement('div');
     msg.style.cssText = 'flex:1';
-    msg.innerHTML = '<span class="rec"></span>';
-    msg.append('Grabando la receta “' + lastTeach + '”. Haz la tarea con normalidad y pulsa Terminar.');
+    const dot = document.createElement('span');
+    dot.className = 'rec';
+    msg.append(dot,'Grabando la receta “' + lastTeach + '”. Haz la tarea con normalidad y pulsa Terminar.');
     const mk = (label, bg, ctrl) => { const b = document.createElement('button'); b.textContent = label;
       b.style.cssText = 'all:unset;cursor:pointer;padding:7px 12px;border-radius:8px;font-weight:600;background:' + bg;
       b.onclick = () => { try { window.__agentTeachEmit && window.__agentTeachEmit({ ctrl }); } catch {} }; return b; };

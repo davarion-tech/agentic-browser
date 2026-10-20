@@ -161,6 +161,7 @@ Funciona con tu suscripción de Claude (`claude setup-token`) o con una API key.
 | `AGENT_PROFILE` | `~/.agentic-browser/profile` | Perfil persistente del agente (cookies y sesiones sobreviven entre reinicios) |
 | `AGENT_DOWNLOADS` | `~/.agentic-browser/downloads` | Carpeta de descargas |
 | `AGENT_CURSOR_SPEED` | `120` | ms por cada 100 px de recorrido; `0` = instantáneo |
+| `AGENT_VIEWPORT` | tamaño de la ventana | Con ventana, Chrome abre maximizado y la página usa el tamaño real de la ventana. `1280x800` lo fija (sin ventana siempre es 1280×800) |
 | `AGENT_TOOLS` | `all` | `core` (13 esenciales) o una lista separada por comas. Menos herramientas, menos tokens en el prompt |
 | `AGENT_HUD` | `0` | `1` muestra el contador de tokens desde el inicio |
 | `AGENT_RECIPES` | `~/.agentic-browser/recipes` | Carpeta de las recetas enseñadas (JSON) |

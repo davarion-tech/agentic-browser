@@ -231,7 +231,7 @@ export function createTools(ab) {
       async run({ dx = 0, dy = 600, snapshot, ...t }) {
         const page = await ab.active();
         if (t.ref !== undefined) { const r = await ab.resolve(t); await ab.moveTo(page, r.x, r.y); return after(page, page.url(), `ok ref ${t.ref} en pantalla @${r.x},${r.y}`, snapshot); }
-        const vp = page.viewportSize() || { width: 1280, height: 800 };
+        const vp = page.viewportSize() || await page.evaluate(() => ({ width: innerWidth, height: innerHeight }));
         const px = t.x ?? ab.cursor.get(page)?.x ?? vp.width / 2, py = t.y ?? ab.cursor.get(page)?.y ?? vp.height / 2;
         await ab.moveTo(page, px, py);
         await page.mouse.wheel(dx, dy);
@@ -544,7 +544,7 @@ export function createTools(ab) {
   ];
 
   function shotTokens() {
-    const vp = (ab.page && !ab.page.isClosed() && ab.page.viewportSize()) || ab.opts.viewport;
+    const vp = (ab.page && !ab.page.isClosed() && ab.page.viewportSize()) || ab.lastViewport || { width: 1280, height: 800 };
     return Math.round((vp.width * vp.height) / 750);
   }
   function stats() {

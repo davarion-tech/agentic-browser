@@ -37,9 +37,17 @@ export class AgentBrowser {
       // ms por cada 100 px de recorrido del cursor; 0 = teletransporte
       cursorSpeed: Number(process.env.AGENT_CURSOR_SPEED ?? 120),
       dialogs: process.env.AGENT_DIALOGS || 'accept',
-      viewport: { width: 1280, height: 800 },
+      viewport: null,
       ...opts,
     };
+    // Con ventana, la página ocupa el tamaño real de la ventana (maximizada): una
+    // fija de 1280x800 no cabe en pantallas con escalado (1280x805 útiles a 150 %).
+    // AGENT_VIEWPORT=1280x800 la fija; sin ventana (headless) se fija siempre.
+    if (!opts.viewport) {
+      const m = String(process.env.AGENT_VIEWPORT || '').match(/^(\d+)x(\d+)$/);
+      this.opts.viewport = m ? { width: +m[1], height: +m[2] } : this.opts.headless ? { width: 1280, height: 800 } : null;
+    }
+    this.lastViewport = this.opts.viewport;
     this.context = null;
     this.page = null;
     this.cursor = new WeakMap();     // page -> {x,y}
@@ -91,7 +99,7 @@ export class AgentBrowser {
           viewport: this.opts.viewport,
           acceptDownloads: true,
           downloadsPath: this.opts.downloadsDir,
-          args: ['--no-first-run', '--no-default-browser-check'],
+          args: ['--no-first-run', '--no-default-browser-check', ...(this.opts.viewport ? [] : ['--start-maximized'])],
         });
       } catch (e) {
         if (/ProcessSingleton|already in use|SingletonLock|lock/i.test(e.message)) {
@@ -226,6 +234,7 @@ export class AgentBrowser {
       const s = await fr.frame.evaluate(o => window.__agentPerc.snapshot(o),
         { ox: fr.ox, oy: fr.oy, viewportOnly, includeText: includeText && fr.id === 0, max }).catch(() => null);
       if (!s) continue;
+      if (!fr.id) this.lastViewport = { width: s.viewport.w, height: s.viewport.h };
       if (fr.id) s.items.forEach(i => (i.ref = `f${fr.id}:${i.ref}`));
       if (!main) main = s; else main.items.push(...s.items);
     }
