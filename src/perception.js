@@ -376,6 +376,52 @@ export const perceptionScript = String.raw`
       return best && bestS >= 6 ? { ref: refOf(best), score: bestS } : null;
     },
 
+    // Popups que tapan la página (idioma, newsletter, cookies, "inicia sesión con Google"):
+    // devuelve su botón de cerrar o rechazar. NUNCA uno de aceptar, suscribirse o iniciar sesión.
+    dismissables({ ox = 0, oy = 0, whole = false } = {}) {
+      const CLOSE = /^(✕|×|✖|╳|x|close|close dialog|cerrar|dismiss|descartar|no,? thanks|no,? gracias|not now|ahora no|maybe later|más tarde|quizás más tarde|later|skip|omitir|reject all|reject|rechazar todo|rechazar todas|rechazar|decline|denegar|only necessary|only essential|necessary only|essential only|solo necesarias|sólo necesarias|solo las necesarias|continue without accepting|continuar sin aceptar|stay on this site|quedarme aquí)$/i;
+      const CLOSE_ATTR = /\b(close|cerrar|dismiss|descartar|fermer|schließen|fechar|chiudi)\b/i;
+      const NEVER = /accept|acept|agree|allow|permit|subscrib|suscrib|sign ?up|sign ?in|log ?in|iniciar|registr|buy|compr|pay|pag|install|instal|download|descarg/i;
+      const vw = innerWidth, vh = innerHeight;
+      const boxes = new Set(deepAll('[role=dialog],[role=alertdialog],[aria-modal=true],dialog[open]'));
+      if (whole && document.body) boxes.add(document.body); // iframe flotante (p. ej. "Inicia sesión con Google")
+      const all = document.body ? document.body.getElementsByTagName('*') : [];
+      for (let i = 0; i < all.length && i < 5000; i++) {
+        const el = all[i];
+        if (el.closest('agent-cursor-host')) continue;
+        const s = getComputedStyle(el);
+        if (s.position !== 'fixed' && s.position !== 'sticky') continue;
+        const r = el.getBoundingClientRect();
+        if (!visible(el, r) || r.width * r.height < vw * vh * 0.03) continue;
+        if (r.top <= 0 && r.height < 120) continue; // cabeceras y menús fijos de la web
+        boxes.add(el);
+      }
+      const out = [];
+      for (const box of boxes) {
+        const br = box.getBoundingClientRect();
+        if (!visible(box, br) || box.closest('agent-cursor-host')) continue;
+        if ([...boxes].some(o => o !== box && o.contains(box))) continue; // el contenedor exterior basta
+        let best = null, rank = 0;
+        for (const b of box.querySelectorAll('button,[role=button],a,[aria-label],[title],span,div,svg')) {
+          const r = b.getBoundingClientRect();
+          if (!visible(b, r) || r.width > 360 || r.height > 80) continue;
+          const txt = clean(b.innerText || b.textContent, 60), attr = (b.getAttribute('aria-label') || b.getAttribute('title') || '');
+          if (NEVER.test(txt) || NEVER.test(attr)) continue;
+          let k = 0;
+          if (/^(reject|rechazar|decline|denegar|only|solo|sólo|necessary|essential|continue without|continuar sin)/i.test(txt)) k = 3;
+          else if (CLOSE.test(txt)) k = 2;
+          else if (!txt && CLOSE_ATTR.test(attr)) k = 2;
+          if (k > rank) { rank = k; best = b.closest('button,[role=button],a') || b; }
+        }
+        if (!best) continue;
+        const r = best.getBoundingClientRect();
+        out.push({ ref: refOf(best), name: clean(name(best), 40) || best.getAttribute('aria-label') || '✕',
+          box: clean(box.getAttribute('aria-label') || box.innerText, 60),
+          x: Math.round(ox + r.x + r.width / 2), y: Math.round(oy + r.y + r.height / 2) });
+      }
+      return out.slice(0, 5);
+    },
+
     get(ref) { return refs.get(ref) || null; },
 
     // Ref obsoleto (la página se re-renderizó): buscar el único elemento con el mismo rol y nombre

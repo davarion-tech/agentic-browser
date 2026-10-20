@@ -14,7 +14,7 @@ export const overlayScript = String.raw`
 
   function mount() {
     if (host && host.isConnected) return;
-    hudEl = teachEl = null;
+    hudEl = teachEl = btnEl = null;
     host = document.createElement('agent-cursor-host');
     host.style.cssText = 'all:initial;position:fixed;inset:0;pointer-events:none;z-index:2147483647;';
     root = host.attachShadow({ mode: 'closed' });
@@ -62,7 +62,7 @@ export const overlayScript = String.raw`
     resize();
     (document.documentElement || document).appendChild(host);
     place();
-    drawHud(); drawTeach();
+    drawHud(); drawTeach(); drawButton();
   }
 
   // Contador de tokens en vivo (browser_cursor_style hud:true o AGENT_HUD=1)
@@ -114,7 +114,7 @@ export const overlayScript = String.raw`
   function drawTeach() {
     if (!root) return;
     if (teachEl) { teachEl.remove(); teachEl = null; }
-    if (!lastTeach) return;
+    if (!lastTeach) return drawButton();
     const bar = document.createElement('div');
     bar.style.cssText = 'position:fixed;left:50%;top:12px;transform:translateX(-50%);pointer-events:auto;z-index:1;' +
       'display:flex;gap:10px;align-items:center;max-width:min(680px,92vw);padding:10px 12px 10px 16px;border-radius:12px;' +
@@ -123,15 +123,58 @@ export const overlayScript = String.raw`
     msg.style.cssText = 'flex:1';
     const dot = document.createElement('span');
     dot.className = 'rec';
-    msg.append(dot,'Grabando la receta “' + lastTeach + '”. Haz la tarea con normalidad y pulsa Terminar.');
+    msg.append(dot, 'Grabando. Haz la tarea con normalidad y pulsa Terminar. Nombre:');
+    // Nombre editable: es lo que la persona le dirá luego al agente ("repite ...")
+    const name = document.createElement('input');
+    name.value = lastTeach;
+    name.style.cssText = 'all:unset;margin-left:8px;padding:4px 8px;border-radius:6px;background:#1f2937;color:#fff;' +
+      'border:1px solid #4b5563;width:170px;font:500 13px system-ui,sans-serif;cursor:text';
+    name.onkeydown = e => e.stopPropagation();
+    msg.append(name);
     const mk = (label, bg, ctrl) => { const b = document.createElement('button'); b.textContent = label;
       b.style.cssText = 'all:unset;cursor:pointer;padding:7px 12px;border-radius:8px;font-weight:600;background:' + bg;
-      b.onclick = () => { try { window.__agentTeachEmit && window.__agentTeachEmit({ ctrl }); } catch {} }; return b; };
+      b.onclick = () => { try { window.__agentTeachEmit && window.__agentTeachEmit({ ctrl, name: name.value.trim() }); } catch {} }; return b; };
     bar.append(msg, mk('Terminar', COLOR, 'done'), mk('Cancelar', '#374151', 'cancel'));
     root.appendChild(bar);
     teachEl = bar;
+    drawButton();
   }
   function teach(label) { lastTeach = label || null; mount(); drawTeach(); }
+
+  // Botón flotante "Enseñar": pestaña pequeña en el borde izquierdo; al pasar el ratón muestra el texto
+  let btnEl = null, btnOn = window.__agentTeachButton === true;
+  function drawButton() {
+    if (!root) return;
+    if (btnEl) { btnEl.remove(); btnEl = null; }
+    if (!btnOn || lastTeach) return;
+    const b = document.createElement('div');
+    b.title = 'Enséñale una tarea a tu agente: hazla una vez y él la repetirá';
+    b.style.cssText = 'position:fixed;left:0;top:50%;transform:translateY(-50%);pointer-events:auto;cursor:pointer;' +
+      'display:flex;align-items:center;gap:8px;height:40px;padding:0 10px 0 12px;border-radius:0 20px 20px 0;' +
+      'background:rgba(17,24,39,.78);color:#fff;font:600 12px system-ui,sans-serif;box-shadow:0 4px 14px rgba(0,0,0,.3);' +
+      'max-width:34px;overflow:hidden;white-space:nowrap;transition:max-width .25s ease,background .2s';
+    const dot = document.createElement('span');
+    dot.style.cssText = 'flex:none;width:11px;height:11px;border-radius:50%;background:' + COLOR;
+    b.append(dot, 'Enseñar una tarea');
+    b.onmouseenter = () => { b.style.maxWidth = '200px'; b.style.background = 'rgba(17,24,39,.95)'; };
+    b.onmouseleave = () => { b.style.maxWidth = '34px'; b.style.background = 'rgba(17,24,39,.78)'; };
+    b.onclick = () => { try { window.__agentTeachEmit && window.__agentTeachEmit({ ctrl: 'start' }); } catch {} };
+    root.appendChild(b);
+    btnEl = b;
+  }
+  function teachButton(on) { btnOn = !!on; mount(); drawButton(); }
+
+  // Aviso breve abajo en el centro
+  function toast(text, ms) {
+    mount();
+    const t = document.createElement('div');
+    t.textContent = text;
+    t.style.cssText = 'position:fixed;left:50%;bottom:64px;transform:translateX(-50%);max-width:min(560px,90vw);' +
+      'padding:10px 16px;border-radius:12px;background:#111827;color:#fff;font:500 14px/1.35 system-ui,sans-serif;' +
+      'box-shadow:0 8px 30px rgba(0,0,0,.35);border:2px solid ' + COLOR + ';transition:opacity .4s';
+    root.appendChild(t);
+    setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 450); }, ms || 6000);
+  }
 
   function resize() {
     if (!trailCanvas) return;
@@ -241,8 +284,8 @@ export const overlayScript = String.raw`
   }
 
   window.__agentCursor = {
-    move, ripple, say, highlight, ask, hud, teach,
-    state: () => ({ hud: !!lastHud, teach: lastTeach }),
+    move, ripple, say, highlight, ask, hud, teach, teachButton, toast,
+    state: () => ({ hud: !!lastHud, teach: lastTeach, teachButton: !!btnEl }),
     get: () => ({ ...pos }),
     trail: on => (enabled.trail = !!on),
     hide: () => host && (host.style.display = 'none'),

@@ -161,6 +161,17 @@ const secret = await call('browser_teach_stop');
 console.log(secret);
 assert.match(secret, /— 2 pasos[\s\S]*1\. dato secreto en password "Clave" \(lo escribe la persona\)\n2\. tecla Enter/);
 assert.doesNotMatch(fs.readFileSync(secret.match(/guardada en (.+)$/m)[1], 'utf8'), /s3creta/);
+// Botón "Enseñar": lo empieza la persona, sin el agente; al pulsar Terminar se guarda sola y avisa
+await call('browser_events');
+await call('browser_eval', { expression: 'window.__agentTeachEmit({ ctrl: "start" }), 1' });
+await call('browser_wait', { ms: 400 });
+assert.match(await call('browser_eval', { expression: 'window.__agentCursor.state().teach' }), /^"tarea-\d{4}-\d\d-\d\d-\d{4}"$/);
+await call('browser_click', { ref: (await call('browser_find', { query: 'Saludar' })).match(/\[(\d+)\] button/)[1] });
+await call('browser_eval', { expression: 'window.__agentTeachEmit({ ctrl: "done", name: "Saludar con botón" }), 1' });
+await call('browser_wait', { ms: 600 });
+assert.match(await call('browser_events'), /"recipe-saved","name":"saludar_con_boton","steps":1/);
+assert.match(await call('browser_recipes', { name: 'saludar_con_boton' }), /1\. clic en button "Saludar"/);
+
 // browser_batch: varias acciones en una llamada, se detiene en el primer error
 const batch = await call('browser_batch', { actions: [
   { tool: 'browser_type', args: { ref: (await call('browser_find', { query: 'Nombre' })).match(/\[(\d+)\] textbox/)[1], text: 'Eva', clear: true } },
@@ -222,6 +233,18 @@ assert.match(nt.split('\n').find(l => l.startsWith('*')), /^\*1 /);
 await call('browser_tabs', { action: 'close' });
 assert.match(await activeTab(), /^\*0 Banco de pruebas/);
 assert.doesNotMatch(await call('browser_events'), /background-tab/);
+
+// Popups: se cierran solos tras navegar (cerrar/rechazar, nunca aceptar ni suscribirse)
+const nav = await call('browser_navigate', { url: pathToFileURL(path.join(here, 'popups.html')).href });
+console.log(nav);
+assert.match(nav, /🧹 cerré popups: “Cerrar”.*“Rechazar todo”/);
+await call('browser_wait', { ms: 2500 });
+const late = await call('browser_snapshot');
+assert.match(nav + late, /“No, gracias”/); // el que llega tarde: al navegar o en la siguiente percepción
+const log = await call('browser_read', { selector: '#log' });
+assert.match(log, /cerró-news rechazó cerró-idioma/);
+assert.doesNotMatch(log, /ACEPTÓ|SUSCRITO/);
+assert.match(await call('browser_dismiss'), /no encontré popups/);
 
 console.log(await call('browser_tabs', { action: 'list' }));
 const shot = await call('browser_screenshot', {});

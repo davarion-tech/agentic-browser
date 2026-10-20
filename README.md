@@ -132,6 +132,8 @@ viewport 1280x800 scroll=0,0 docH=2090
 ## New in 1.1
 
 - **Teach it once, replay forever.** `browser_teach_start` records a task while *you* do it in the agent's Chrome (clicks, text, selects, Enter). It is saved as a recipe of roles and names, not pixels, so it survives layout changes. `browser_replay` repeats it with new values (`{"search": "October invoices"}`) without perceiving every step. Passwords are never recorded: on replay, the person types them.
+- **An "Enseñar" (teach) button in the browser.** A small tab on the left edge of the agent's Chrome starts a recording without asking the agent. Name the recipe in the banner, press Finish, then tell your agent "repeat <name>". Disable it with `AGENT_TEACH_BUTTON=0`.
+- **A clean screen.** Chrome's translate bar, search-engine choice, restore-pages bubble and permission prompts are off (permissions are denied). After every navigation, website popups (language, newsletter, cookie banners, "Sign in with Google") are closed with visible clicks on their close or reject button, never accept, subscribe or sign in. `browser_dismiss` does it on demand; `AGENT_AUTO_DISMISS=0` turns the automatic pass off.
 - **Structured data in one call.** `browser_extract` turns the most relevant table or repeated list (products, search results, contacts) into JSON or CSV rows with title, link, price and image. Merged table headers are resolved. CSV output is safe to open in Excel.
 - **Live token counter.** `browser_cursor_style({ hud: true })` (or `AGENT_HUD=1`) shows, in the corner of the page, the tokens used against what screenshots would have cost. `browser_stats` returns the same numbers. Formula: tokens ≈ characters / 4; one screenshot ≈ width × height / 750 per perception call.
 
@@ -153,6 +155,7 @@ viewport 1280x800 scroll=0,0 docH=2090
 | `browser_teach_start` / `browser_teach_stop` | Record a task the person performs once, as a reusable recipe |
 | `browser_recipes` / `browser_replay` | List or show recipes; replay one with new `params` at almost zero tokens |
 | `browser_stats` | Tokens used this session vs. the screenshot equivalent |
+| `browser_dismiss` | Close popups covering the page (close or reject only, never accept). Runs automatically after `browser_navigate` |
 | `browser_batch` | Several actions in one call, in order, stopping at the first error. Saves one agent turn per action |
 | `browser_wait` / `browser_watch` | Wait for time, text or selector. `browser_watch` sleeps at **zero tokens** until the page changes (new message, title "(3) Inbox"…) |
 | `browser_request_human` | Hand control to the person watching (login, 2FA, CAPTCHA, a decision) through an on-page banner |
@@ -177,6 +180,8 @@ Most actions accept `snapshot: true` and return the new page state in the same r
 | `AGENT_CURSOR_SPEED` | from `AGENT_SPEED` | ms per 100 px of cursor travel; `0` = instant |
 | `AGENT_VIEWPORT` | window size | With a window, Chrome opens maximized and the page uses the real window size. `1280x800` fixes it (headless always uses 1280×800) |
 | `AGENT_TOOLS` | `all` | `core` (13 essential tools) or a comma-separated list. Fewer tools means fewer prompt tokens |
+| `AGENT_AUTO_DISMISS` | `1` | `0` stops closing website popups after each navigation |
+| `AGENT_TEACH_BUTTON` | `1` | `0` hides the floating "Enseñar" button |
 | `AGENT_HUD` | `0` | `1` shows the live token counter from the start |
 | `AGENT_RECIPES` | `~/.agentic-browser/recipes` | Where taught recipes are saved (JSON) |
 | `AGENT_EXPORTS` | `~/.agentic-browser/exports` | Where `browser_extract` writes files |

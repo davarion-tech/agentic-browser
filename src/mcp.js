@@ -13,7 +13,8 @@ const INSTRUCTIONS = `agentic-browser controla un Chrome real del agente (perfil
 
 Cómo percibir: usa browser_snapshot (texto con refs y coordenadas) y browser_snapshot con diff:true tras cada acción. Evita browser_screenshot salvo contenido puramente visual. Para tablas y listas (productos, resultados, contactos) usa browser_extract, que devuelve filas JSON o CSV en una llamada. Si ya sabes los siguientes pasos, envíalos juntos con browser_batch: cada turno que ahorras es tiempo para el usuario.
 
-Tareas repetidas: si el usuario va a repetir una tarea, ofrécele el modo enseñar (browser_teach_start; la persona la hace una vez y pulsa "Terminar"; luego browser_teach_stop). Antes de repetir una tarea, mira browser_recipes y usa browser_replay con params nuevos en lugar de percibir cada paso. Las contraseñas nunca se graban: al repetir, las escribe la persona.
+Tareas repetidas: si el usuario va a repetir una tarea, ofrécele el modo enseñar (browser_teach_start; la persona la hace una vez y pulsa "Terminar"; luego browser_teach_stop). Antes de repetir una tarea, mira browser_recipes y usa browser_replay con params nuevos en lugar de percibir cada paso. Las contraseñas nunca se graban: al repetir, las escribe la persona. La persona también puede pulsar el botón "Enseñar" del borde izquierdo del navegador; verás un evento recipe-saved y la receta en browser_recipes.
+Popups: tras cada navegación se cierran solos los que tapan la página (idioma, newsletter, cookies), siempre con cerrar o rechazar. Si aparece otro después, usa browser_dismiss.
 
 Antes de actuar en cuentas o enviar algo en nombre de alguien, pregunta al usuario de forma didáctica, una pregunta a la vez y explicando las opciones:
 1. ¿Las cuentas abiertas son del agente o del usuario, y está autorizado a usarlas?

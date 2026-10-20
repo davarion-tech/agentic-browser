@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><title>Popups</title></head>
+<body style="font:15px system-ui;margin:40px">
+<h1>Página con popups</h1>
+<p id="log"></p>
+<div id="cookies" style="position:fixed;left:0;right:0;bottom:0;padding:20px;background:#eee">Usamos cookies.
+  <button onclick="log.textContent += 'ACEPTÓ '; cookies.remove()">Aceptar todo</button>
+  <button onclick="log.textContent += 'rechazó '; cookies.remove()">Rechazar todo</button>
+</div>
+<div id="news" role="dialog" aria-modal="true" style="position:fixed;top:120px;left:300px;width:400px;height:220px;background:#fff;border:1px solid #999;padding:20px">
+  <button aria-label="Cerrar" onclick="news.remove(); log.textContent += 'cerró-news '">×</button>
+  <h2>Suscríbete a la newsletter</h2>
+  <button onclick="log.textContent += 'SUSCRITO '">Suscribirme</button>
+</div>
+<script>
+  // Popup que llega tarde, como los de idioma o cookies de muchas webs
+  setTimeout(() => {
+    const d = document.createElement('div');
+    d.id = 'late'; d.setAttribute('role', 'dialog');
+    d.style.cssText = 'position:fixed;top:400px;left:300px;width:300px;height:120px;background:#ffd';
+    const b = document.createElement('button');
+    b.textContent = 'No, gracias';
+    b.onclick = () => { d.remove(); log.textContent += 'cerró-idioma '; };
+    d.append('¿Cambiar a English? ', b);
+    document.body.append(d);
+  }, 2000);
+</script>
+</body></html>

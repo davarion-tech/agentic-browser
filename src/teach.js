@@ -16,7 +16,8 @@ export class Teacher {
   constructor(ab) {
     this.ab = ab;
     this.session = null;
-    this.bound = false;
+    // El navegador expone __agentTeachEmit en todas las páginas y nos pasa sus eventos
+    ab.onTeach = (page, e) => this.onEvent(page, e);
   }
 
   file(name) {
@@ -25,17 +26,13 @@ export class Teacher {
     return path.join(DIR, n + '.json');
   }
 
-  async start(name, page) {
+  // user: la persona empezó con el botón flotante; al pulsar Terminar se guarda sola
+  async start(name, page, { user = false } = {}) {
     if (this.session) throw new Error(`ya se está grabando "${this.session.label}"; termina con browser_teach_stop`);
     this.file(name);
-    if (!this.bound) {
-      // Disponible en todos los frames y documentos futuros; fuera de una grabación se ignora
-      await this.ab.context.exposeBinding('__agentTeachEmit', (src, e) => this.onEvent(e));
-      this.bound = true;
-    }
     let finish;
     const done = new Promise(r => (finish = r));
-    const s = { name: slug(name), label: name, page, startUrl: page.url(), events: [], lastAt: Date.now(), lastUrl: page.url(), done, finish };
+    const s = { name: slug(name), label: name, page, user, startUrl: page.url(), events: [], lastAt: Date.now(), lastUrl: page.url(), done, finish };
     // Navegación sin un clic o Enter reciente: la persona escribió una URL
     s.onNav = f => {
       if (f !== page.mainFrame()) return;
@@ -52,12 +49,35 @@ export class Teacher {
     return s;
   }
 
-  onEvent(e) {
+  onEvent(page, e) {
+    if (!e) return;
+    if (e.ctrl === 'start') {
+      if (this.session) return;
+      const d = new Date(), p = n => String(n).padStart(2, '0');
+      const name = `tarea-${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`;
+      this.start(name, page, { user: true }).catch(() => {});
+      return;
+    }
     const s = this.session;
-    if (!s || !e) return;
-    if (e.ctrl) return s.finish(e.ctrl);
+    if (!s) return;
+    if (e.ctrl) {
+      if (e.name && slug(e.name)) { s.label = String(e.name).slice(0, 60); s.name = slug(e.name); }
+      s.finish(e.ctrl);
+      if (s.user) this.finishUser(e.ctrl);
+      return;
+    }
     s.lastAt = Date.now();
     s.events.push(e);
+  }
+
+  // Grabación empezada con el botón: nadie llama a browser_teach_stop, así que se cierra aquí
+  async finishUser(ctrl) {
+    const s = this.session;
+    const r = await this.stop({ how: ctrl }).catch(e => ({ error: e.message }));
+    const msg = r.recipe ? `✓ Receta “${r.recipe.label}” guardada (${r.recipe.steps.length} pasos). Pídele a tu agente: “repite ${r.recipe.label}”.`
+      : r.cancelled ? 'Grabación cancelada: no se guardó nada.' : 'No se grabó ningún paso.';
+    await s.page.evaluate(t => window.__agentCursor?.toast(t), msg).catch(() => {});
+    if (r.recipe) this.ab.events.push({ type: 'recipe-saved', name: r.recipe.name, steps: r.recipe.steps.length, params: Object.keys(r.recipe.params), note: 'la persona grabó esta receta con el botón Enseñar; repítela con browser_replay' });
   }
 
   async bar(page, text) {
@@ -65,11 +85,11 @@ export class Teacher {
     await page.evaluate(t => window.__agentCursor?.teach(t), text || null).catch(() => {});
   }
 
-  async stop({ wait = true, timeout = 600000 } = {}) {
+  async stop({ wait = true, timeout = 600000, how: forced } = {}) {
     const s = this.session;
     if (!s) throw new Error('no hay ninguna grabación en curso; empieza con browser_teach_start');
-    let how = 'stopped';
-    if (wait) how = await Promise.race([s.done, sleep(timeout).then(() => 'timeout')]);
+    let how = forced || 'stopped';
+    if (!forced && wait) how = await Promise.race([s.done, sleep(timeout).then(() => 'timeout')]);
     s.page.off('framenavigated', s.onNav);
     s.page.off('load', s.onLoad);
     this.session = null;

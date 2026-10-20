@@ -122,6 +122,8 @@ Funciona con tu suscripción de Claude (`claude setup-token`) o con una API key.
 ## Novedades de la 1.1
 
 - **Enséñalo una vez y se repite siempre.** `browser_teach_start` graba una tarea mientras *tú* la haces en el Chrome del agente (clics, textos, selecciones, Enter). Se guarda como receta de roles y nombres, no de píxeles, así que aguanta cambios de diseño. `browser_replay` la repite con valores nuevos (`{"buscar": "facturas de octubre"}`) sin percibir cada paso. Las contraseñas nunca se graban: al repetir, las escribe la persona.
+- **Botón "Enseñar" en el navegador.** Una pestaña pequeña en el borde izquierdo del Chrome del agente empieza a grabar sin pedírselo al agente. Pones nombre a la receta en el banner, pulsas Terminar y luego le dices a tu agente "repite <nombre>". Se oculta con `AGENT_TEACH_BUTTON=0`.
+- **Pantalla limpia.** La barra de traducir, la elección de buscador, el aviso de restaurar páginas y las preguntas de permisos de Chrome vienen apagados (los permisos se deniegan). Tras cada navegación se cierran los popups de las webs (idioma, newsletter, cookies, "Inicia sesión con Google") con clics visibles en su botón de cerrar o rechazar, nunca aceptar, suscribirse ni iniciar sesión. `browser_dismiss` lo hace cuando quieras; `AGENT_AUTO_DISMISS=0` apaga el cierre automático.
 - **Datos estructurados en una llamada.** `browser_extract` convierte la tabla o lista repetida más relevante (productos, resultados, contactos) en filas JSON o CSV con título, enlace, precio e imagen. Resuelve cabeceras combinadas, y el CSV se puede abrir en Excel sin riesgo.
 - **Contador de tokens en vivo.** `browser_cursor_style({ hud: true })` (o `AGENT_HUD=1`) muestra en la esquina de la página los tokens usados frente a lo que habrían costado las capturas. `browser_stats` devuelve las mismas cifras. Fórmula: tokens ≈ caracteres / 4; una captura ≈ ancho × alto / 750 por cada percepción.
 
@@ -143,6 +145,7 @@ Funciona con tu suscripción de Claude (`claude setup-token`) o con una API key.
 | `browser_teach_start` / `browser_teach_stop` | Graba una tarea que la persona hace una vez, como receta reutilizable |
 | `browser_recipes` / `browser_replay` | Lista o muestra recetas; repite una con `params` nuevos casi sin gastar tokens |
 | `browser_stats` | Tokens usados en la sesión frente al equivalente en capturas |
+| `browser_dismiss` | Cierra popups que tapan la página (solo cerrar o rechazar, nunca aceptar). Se ejecuta solo tras `browser_navigate` |
 | `browser_batch` | Varias acciones en una sola llamada, en orden, deteniéndose en el primer error. Ahorra un turno del agente por acción |
 | `browser_wait` / `browser_watch` | Esperar tiempo, un texto o un selector. `browser_watch` espera con **cero tokens** hasta que la página cambia (mensaje nuevo, título "(3) Bandeja"…) |
 | `browser_request_human` | Pasa el control a la persona que mira (login, 2FA, CAPTCHA, una decisión) con un banner en la página |
@@ -165,6 +168,8 @@ Funciona con tu suscripción de Claude (`claude setup-token`) o con una API key.
 | `AGENT_CURSOR_SPEED` | según `AGENT_SPEED` | ms por cada 100 px de recorrido; `0` = instantáneo |
 | `AGENT_VIEWPORT` | tamaño de la ventana | Con ventana, Chrome abre maximizado y la página usa el tamaño real de la ventana. `1280x800` lo fija (sin ventana siempre es 1280×800) |
 | `AGENT_TOOLS` | `all` | `core` (13 esenciales) o una lista separada por comas. Menos herramientas, menos tokens en el prompt |
+| `AGENT_AUTO_DISMISS` | `1` | `0` deja de cerrar los popups de las webs tras cada navegación |
+| `AGENT_TEACH_BUTTON` | `1` | `0` oculta el botón flotante "Enseñar" |
 | `AGENT_HUD` | `0` | `1` muestra el contador de tokens desde el inicio |
 | `AGENT_RECIPES` | `~/.agentic-browser/recipes` | Carpeta de las recetas enseñadas (JSON) |
 | `AGENT_EXPORTS` | `~/.agentic-browser/exports` | Carpeta donde `browser_extract` guarda archivos |

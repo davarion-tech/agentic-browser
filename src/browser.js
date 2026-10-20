@@ -107,7 +107,11 @@ export class AgentBrowser {
           viewport: this.opts.viewport,
           acceptDownloads: true,
           downloadsPath: this.opts.downloadsDir,
-          args: ['--no-first-run', '--no-default-browser-check', ...(this.opts.viewport ? [] : ['--start-maximized'])],
+          // Pantalla limpia para quien mira: sin barra de traducir, sin elegir buscador, sin
+          // "restaurar páginas" y sin preguntas de permisos (se deniegan: más privado)
+          args: ['--no-first-run', '--no-default-browser-check', '--disable-features=Translate,TranslateUI',
+            '--disable-search-engine-choice-screen', '--hide-crash-restore-bubble', '--deny-permission-prompts',
+            ...(this.opts.viewport ? [] : ['--start-maximized'])],
         });
       } catch (e) {
         if (/ProcessSingleton|already in use|SingletonLock|lock/i.test(e.message)) {
@@ -117,6 +121,9 @@ export class AgentBrowser {
         throw e;
       }
     }
+    // Canal página -> servidor del modo enseñar (botón flotante y banner). Antes del overlay.
+    await this.context.exposeBinding('__agentTeachEmit', (src, e) => this.onTeach?.(src.page, e)).catch(() => {});
+    await this.context.addInitScript(on => { window.__agentTeachButton = on; }, process.env.AGENT_TEACH_BUTTON !== '0' && !this.opts.headless);
     await this.context.addInitScript(overlayScript);
     await this.context.addInitScript(perceptionScript);
     this.context.on('page', p => this._onPage(p));

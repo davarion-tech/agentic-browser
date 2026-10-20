@@ -20,6 +20,7 @@ const CORE = ['browser_navigate', 'browser_snapshot', 'browser_find', 'browser_c
 // Herramientas que "miran" la página: un agente basado en capturas haría una captura en cada una
 const PERCEIVE = new Set(['browser_snapshot', 'browser_find', 'browser_read', 'browser_extract', 'browser_element_at', 'browser_cursor']);
 const estTokens = s => Math.ceil(String(s).length / 4);
+const AUTO_DISMISS = process.env.AGENT_AUTO_DISMISS !== '0';
 
 // CSV seguro para Excel: comillas escapadas y sin fórmulas inyectadas desde la web
 function toCsv(cols, rows) {
@@ -57,6 +58,7 @@ export function createTools(ab) {
   const meter = { calls: 0, used: 0, shots: 0, perceptions: 0 };
   let replaySteps = 0;
   let wrappedRef = []; // herramientas envueltas, para browser_batch
+  let dismissArm = null; // tras navegar, una revisión más de popups antes de la siguiente percepción
 
   async function settle(page, before) {
     await sleep(ab.speed.settle);
@@ -93,6 +95,33 @@ export function createTools(ab) {
     return { ...r, target };
   }
 
+  // Cierra popups que tapan la página con clics visibles. Solo botones de cerrar o rechazar.
+  async function dismissPopups(page) {
+    const closed = [];
+    for (let round = 0; round < 3; round++) {
+      const cands = [];
+      for (const fr of await ab.frames(page)) {
+        await ab.ensure(fr.frame);
+        // Un iframe flotante (posición fija) es un popup entero, p. ej. "Inicia sesión con Google"
+        const whole = fr.id ? await fr.frame.frameElement().then(h => h.evaluate(e => {
+          for (let n = e; n && n.nodeType === 1; n = n.parentElement) if (getComputedStyle(n).position === 'fixed') return true;
+          return false;
+        })).catch(() => false) : false;
+        const r = await fr.frame.evaluate(o => window.__agentPerc.dismissables(o), { ox: fr.ox, oy: fr.oy, whole }).catch(() => []);
+        cands.push(...r);
+      }
+      if (!cands.length) break;
+      const c = cands[0];
+      await ab.annotate(page, `cerrar popup “${c.name}”`, null);
+      await ab.moveTo(page, c.x, c.y);
+      await ab.ripple(page, c.x, c.y);
+      await page.mouse.click(c.x, c.y, { delay: 30 });
+      closed.push(`“${c.name}”${c.box ? ` en «${c.box.slice(0, 40)}»` : ''}`);
+      await sleep(ab.speed.settle * 3);
+    }
+    return closed;
+  }
+
   async function withModifiers(page, mods = [], fn) {
     for (const m of mods) await page.keyboard.down(m);
     try { return await fn(); } finally { for (const m of mods.reverse()) await page.keyboard.up(m); }
@@ -108,7 +137,15 @@ export function createTools(ab) {
         if (!/^[a-z][\w+.-]*:/i.test(url)) url = 'https://' + url;
         if (!ab.originAllowed(url)) throw new Error(`${url} está fuera de AGENT_ALLOWED_ORIGINS`);
         await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
-        return after(page, page.url(), `ok: "${await page.title()}"`, snapshot);
+        let msg = `ok: "${await page.title()}"`;
+        if (AUTO_DISMISS) {
+          await sleep(ab.speed.settle * 5);
+          const c = await dismissPopups(page);
+          if (c.length) msg += `\n🧹 cerré popups: ${c.join('; ')}`;
+          // Segunda oportunidad para los que tardan en salir (cookies): en la próxima percepción
+          dismissArm = { page, url: page.url(), until: Date.now() + 10000 };
+        }
+        return after(page, page.url(), msg, snapshot);
       },
     },
     {
@@ -419,12 +456,27 @@ export function createTools(ab) {
     {
       name: 'browser_cursor_style',
       description: 'Muestra/oculta el cursor visual, su estela o el contador de tokens en vivo (hud) en la esquina de la página.',
-      schema: { visible: z.boolean().optional(), trail: z.boolean().optional(), hud: z.boolean().optional().describe('Contador de tokens frente a capturas, visible para quien mira') },
-      async run({ visible, trail, hud }) {
+      schema: {
+        visible: z.boolean().optional(), trail: z.boolean().optional(),
+        hud: z.boolean().optional().describe('Contador de tokens frente a capturas, visible para quien mira'),
+        teachButton: z.boolean().optional().describe('Botón flotante "Enseñar una tarea" en el borde izquierdo'),
+      },
+      async run({ visible, trail, hud, teachButton }) {
         const page = await ab.active();
-        await page.evaluate(([v, t]) => { const c = window.__agentCursor; if (!c) return; if (v === true) c.show(); if (v === false) c.hide(); if (t !== undefined && t !== null) c.trail(t); }, [visible, trail]);
+        await page.evaluate(([v, t, b]) => { const c = window.__agentCursor; if (!c) return; if (v === true) c.show(); if (v === false) c.hide();
+          if (t !== undefined && t !== null) c.trail(t); if (b !== undefined && b !== null) c.teachButton(b); }, [visible, trail, teachButton]);
         if (hud !== undefined) { ab.hud.on = hud; await ab.showHud(page); }
         return 'ok';
+      },
+    },
+    {
+      name: 'browser_dismiss',
+      description: 'Cierra popups que tapan la página (idioma, newsletter, cookies, "inicia sesión con Google"), con clics visibles. Solo pulsa botones de cerrar o rechazar, nunca aceptar, suscribirse ni iniciar sesión. Ya se hace solo tras browser_navigate (AGENT_AUTO_DISMISS=0 lo apaga).',
+      schema: {},
+      async run() {
+        const page = await ab.active();
+        const c = await dismissPopups(page);
+        return c.length ? `cerré ${c.length} popup(s): ${c.join('; ')}` : 'no encontré popups que cerrar';
       },
     },
     {
@@ -608,9 +660,20 @@ export function createTools(ab) {
       repeats = sig === lastSig ? repeats + 1 : 1;
       lastSig = sig;
       const t0 = Date.now();
-      let ok = true, out;
+      let ok = true, out, pre = '';
       try {
+        // Popups que salen tarde tras navegar: se cierran antes de la siguiente percepción,
+        // nunca después de que el agente haya interactuado (podría ser una ventana que él abrió)
+        if (INPUT.has(t.name) || t.name === 'browser_navigate') dismissArm = null;
+        else if (dismissArm && PERCEIVE.has(t.name)) {
+          const a = dismissArm; dismissArm = null;
+          if (a.page === ab.page && !a.page.isClosed() && a.page.url() === a.url && Date.now() < a.until) {
+            const c = await dismissPopups(a.page);
+            if (c.length) pre = `🧹 cerré popups: ${c.join('; ')}\n`;
+          }
+        }
         out = await t.run(args);
+        if (pre && typeof out === 'string') out = pre + out;
         if (repeats >= 3 && typeof out === 'string') out += `\n⚠ Has repetido esta misma acción ${repeats} veces. Si la página no cambia, prueba otra estrategia o usa browser_request_human.`;
         return out;
       } catch (e) { ok = false; out = e.message; throw e; }

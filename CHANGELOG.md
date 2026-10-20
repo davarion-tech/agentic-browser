@@ -13,6 +13,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Live token counter: `browser_cursor_style({ hud: true })` or `AGENT_HUD=1` draws a corner panel with tokens used, the screenshot equivalent and the ratio. `browser_stats` returns the same numbers.
 - `browser_extract` joins the `core` tool set (13 tools).
 - `AGENT_VIEWPORT` to fix the page size (for example `1280x800`).
+- Floating "Enseñar" button on the left edge of the agent's Chrome: the person starts a recording without the agent, names it in the banner and presses Finish; the recipe is saved, a toast confirms it and the agent gets a `recipe-saved` event. `AGENT_TEACH_BUTTON=0` hides it.
+- `browser_dismiss` and an automatic pass after `browser_navigate` (plus one more before the next perception) close website popups through their close or reject button, never accept, subscribe or sign in. `AGENT_AUTO_DISMISS=0` turns it off.
+- Chrome starts without the translate bar, the search-engine choice screen, the restore-pages bubble and permission prompts (denied).
 - `browser_batch` runs up to 30 actions in one call, in order, and stops at the first error.
 - `AGENT_SPEED=fast|normal|demo` presets for cursor travel, typing delay and settle time.
 - `browser_type` keeps the focused field on screen before and after typing, so the person watching sees the text appear.
