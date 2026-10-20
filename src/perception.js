@@ -110,6 +110,147 @@ export const perceptionScript = String.raw`
 
   function inView(r) { return r.bottom > 0 && r.right > 0 && r.top < innerHeight && r.left < innerWidth; }
 
+  // ---- Extracción estructurada (browser_extract) ----
+  const absUrl = u => { try { return new URL(u, location.href).href; } catch { return u; } };
+  const uniq = cols => { const seen = {}; return cols.map(c => (seen[c] = (seen[c] || 0) + 1) > 1 ? c + '_' + seen[c] : c); };
+  const PRICE = /(?:[$€£¥₹]|USD|EUR|MXN|COP|ARS|CLP)\s?\d[\d.,]*|\d[\d.,]*\s?(?:[€£]|USD|EUR|MXN|COP|ARS|CLP)/i;
+
+  // Rejilla real de la tabla: expande rowspan/colspan para que cada celda caiga en su columna
+  function grid(rows) {
+    const g = [];
+    rows.forEach((r, ri) => {
+      g[ri] = g[ri] || [];
+      let ci = 0;
+      for (const c of r.cells) {
+        while (g[ri][ci]) ci++;
+        const cs = Math.min(c.colSpan || 1, 50), rs = Math.min(c.rowSpan || 1, rows.length - ri);
+        for (let y = 0; y < rs; y++) for (let x = 0; x < cs; x++) { g[ri + y] = g[ri + y] || []; g[ri + y][ci + x] = c; }
+        ci += cs;
+      }
+    });
+    return g;
+  }
+  const headText = c => clean((c.innerText || '').replace(/\[[^\]]{1,4}\]/g, ''), 60);
+
+  function tableData(t, max) {
+    const rows = [...t.rows].filter(r => visible(r, r.getBoundingClientRect()));
+    // Cabecera: el <thead> o las primeras filas que solo tienen <th>
+    let nh = 0;
+    while (nh < rows.length && (t.tHead?.contains(rows[nh]) || (rows[nh].querySelector('th') && !rows[nh].querySelector('td')))) nh++;
+    const g = grid(rows);
+    const width = Math.max(...g.map(r => r.length));
+    const cols = [];
+    for (let x = 0; x < width; x++) {
+      const parts = [];
+      for (let y = 0; y < nh; y++) { const c = g[y][x]; const s = c && headText(c); if (s && !parts.includes(s)) parts.push(s); }
+      cols.push(parts.join(' / ') || 'col' + (x + 1));
+    }
+    const names = uniq(cols);
+    const out = [];
+    for (let y = nh; y < rows.length && out.length < max; y++) {
+      const o = {}; let any = false;
+      for (let x = 0; x < width; x++) {
+        const c = g[y][x];
+        if (!c || (x > 0 && g[y][x - 1] === c)) continue; // colspan: la celda va solo en su primera columna
+        const k = names[x], v = clean(c.innerText, 200);
+        if (v) any = true;
+        o[k] = v;
+        const a = c.querySelector('a[href]');
+        if (a && !/^(#|javascript:)/i.test(a.getAttribute('href'))) o[k + '_url'] = absUrl(a.getAttribute('href'));
+      }
+      if (any) out.push(o);
+    }
+    return { kind: 'table', rows: out, total: rows.length - nh };
+  }
+
+  // Grupo de hermanos que se repiten (tarjetas de producto, resultados, <li>): el de más contenido
+  const sig = el => el.tagName + '.' + [...el.classList].filter(c => !/\d/.test(c)).sort().join('.');
+  function bestGroup(root) {
+    let best = null;
+    const cands = [root, ...root.querySelectorAll('*')];
+    for (let i = 0; i < cands.length && i < 8000; i++) {
+      const p = cands[i];
+      if (/^(TABLE|THEAD|TBODY|TFOOT|TR|SELECT|SCRIPT|STYLE|SVG|HEAD)$/i.test(p.tagName) || p.closest('agent-cursor-host')) continue;
+      if (p.children.length < 3) continue;
+      const counts = new Map();
+      for (const k of p.children) counts.set(sig(k), (counts.get(sig(k)) || 0) + 1);
+      const [s, n] = [...counts].sort((a, b) => b[1] - a[1])[0];
+      if (n < 3) continue;
+      const items = [...p.children].filter(k => sig(k) === s && visible(k, k.getBoundingClientRect()) && clean(k.innerText, 5));
+      if (items.length < 3) continue;
+      const avg = items.reduce((a, k) => a + Math.min(300, (k.innerText || '').length), 0) / items.length;
+      const score = items.length * avg * (items.some(k => k.querySelector('a[href],img')) ? 1.5 : 1);
+      if (!best || score > best.score) best = { items, score };
+    }
+    return best;
+  }
+
+  function itemData(el) {
+    const o = {};
+    const h = el.querySelector('h1,h2,h3,h4,h5,h6,[role=heading]');
+    const a = el.matches('a[href]') ? el : el.querySelector('a[href]');
+    const txt = el.innerText || '';
+    o.title = clean((h && h.innerText) || (a && a.innerText) || txt.split('\n').find(l => l.trim()) || '', 120);
+    if (a && !/^(#|javascript:)/i.test(a.getAttribute('href'))) o.url = absUrl(a.getAttribute('href'));
+    const pm = txt.match(PRICE);
+    if (pm) o.price = pm[0].trim();
+    const img = el.querySelector('img');
+    if (img && (img.currentSrc || img.src)) o.image = absUrl(img.currentSrc || img.src);
+    const rest = clean(txt, 240);
+    if (rest && rest !== o.title) o.text = rest;
+    return o;
+  }
+
+  // ---- Modo enseñar: descripción estable de un elemento (rol + nombre, no píxeles) ----
+  const isField = el => !!el && el.nodeType === 1 && ((/^(INPUT|TEXTAREA)$/.test(el.tagName) &&
+    !/^(checkbox|radio|button|submit|reset|file|image|range|color)$/i.test(el.type)) || el.isContentEditable);
+  const isSecret = el => el.type === 'password' || /cc-|one-time-code|password/i.test(el.autocomplete || '');
+  // El nombre de un campo no puede depender de lo que hay escrito dentro
+  function stableName(el) {
+    if (!isField(el)) return clean(name(el), 80);
+    const lb = el.getAttribute('aria-label') || (el.labels && el.labels[0] && el.labels[0].innerText) ||
+      el.getAttribute('placeholder') || el.getAttribute('title') || el.getAttribute('name') || '';
+    return clean(lb, 80);
+  }
+  function recipeTarget(el) {
+    const t = { role: role(el), name: stableName(el) };
+    if (el.id && !/\d{3,}|^:r|^_r_/.test(el.id)) t.id = el.id;
+    if (el.getAttribute('href')) t.href = el.getAttribute('href');
+    if (el.getAttribute('name')) t.field = el.getAttribute('name');
+    if (el.getAttribute('placeholder')) t.placeholder = el.getAttribute('placeholder');
+    return t;
+  }
+
+  // Solo emite si el servidor está grabando una receta (expone __agentTeachEmit)
+  const emit = e => { try { if (typeof window.__agentTeachEmit === 'function') window.__agentTeachEmit(e); } catch {} };
+  const origin = e => { const p = e.composedPath()[0]; return p instanceof Element ? p : e.target; };
+  function emitType(el) {
+    const secret = isSecret(el);
+    emit({ action: 'type', target: recipeTarget(el), value: secret ? null : (el.isContentEditable ? el.innerText : el.value), secret, url: location.href });
+  }
+  addEventListener('click', e => {
+    if (!e.isTrusted || e.button !== 0) return;
+    const el = origin(e);
+    if (!(el instanceof Element) || el.closest('agent-cursor-host')) return;
+    const t = el.closest(INTERACTIVE) || el;
+    if (isField(t) || /^(SELECT|OPTION)$/.test(t.tagName)) return; // los cubre el paso type/select
+    emit({ action: 'click', target: recipeTarget(t), url: location.href });
+  }, true);
+  addEventListener('change', e => {
+    const el = origin(e);
+    if (!(el instanceof Element)) return;
+    if (el.tagName === 'SELECT') emit({ action: 'select', target: recipeTarget(el), value: [...el.selectedOptions].map(o => o.text.trim()), url: location.href });
+    else if (isField(el)) emitType(el);
+  }, true);
+  // input: el paso queda en el orden real (change llega al perder el foco); el servidor junta las pulsaciones
+  addEventListener('input', e => { const el = origin(e); if (el instanceof Element && isField(el)) emitType(el); }, true);
+  addEventListener('focusout', e => { const el = origin(e); if (el instanceof Element && el.isContentEditable) emitType(el); }, true);
+  addEventListener('keydown', e => {
+    if (!e.isTrusted || e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
+    const el = origin(e);
+    if (isField(el) && el.tagName !== 'TEXTAREA' && !el.isContentEditable) { emitType(el); emit({ action: 'press', key: 'Enter', url: location.href }); }
+  }, true);
+
   window.__agentPerc = {
     snapshot({ ox = 0, oy = 0, viewportOnly = true, includeText = false, max = 250 } = {}) {
       const sel = INTERACTIVE + ',' + LANDMARK;
@@ -188,6 +329,51 @@ export const perceptionScript = String.raw`
         if (out.length >= max) break;
       }
       return out;
+    },
+
+    // Tabla o lista repetida -> filas. kind: auto | table | list
+    extract({ ref, selector, kind = 'auto', max = 100 } = {}) {
+      const root = ref != null ? refs.get(ref) : selector ? document.querySelector(selector) : document.body;
+      if (!root || !root.isConnected) return { error: ref != null ? 'ref ' + ref + ' obsoleto; vuelve a llamar a browser_snapshot' : 'no encuentro ' + (selector || 'el documento') };
+      let table = null, list = null;
+      if (kind !== 'list') {
+        const ts = (root.tagName === 'TABLE' ? [root] : [...root.querySelectorAll('table')])
+          .filter(t => t.rows.length >= 2 && visible(t, t.getBoundingClientRect()) && !t.closest('agent-cursor-host'))
+          .map(t => ({ t, score: t.rows.length * Math.min(300, (t.innerText || '').length / t.rows.length) }))
+          .sort((a, b) => b.score - a.score);
+        if (ts[0]) { table = tableData(ts[0].t, max); table.score = ts[0].score; }
+      }
+      if (kind !== 'table') {
+        const g = bestGroup(root);
+        if (g) list = { kind: 'list', rows: g.items.slice(0, max).map(itemData), total: g.items.length, score: g.score };
+      }
+      const pick = kind === 'table' ? table : kind === 'list' ? list
+        : table && (!list || table.score >= list.score * 0.6) ? table : list;
+      if (!pick || !pick.rows.length) return { error: 'no encuentro ninguna ' + (kind === 'table' ? 'tabla' : kind === 'list' ? 'lista repetida' : 'tabla ni lista repetida') + ' visible' };
+      delete pick.score;
+      pick.columns = [...new Set(pick.rows.flatMap(Object.keys))];
+      return pick;
+    },
+
+    // Encuentra el elemento de un paso de receta por rol, nombre, id, href o campo
+    locate(d) {
+      let best = null, bestS = 0;
+      for (const el of deepAll(INTERACTIVE + ',' + LANDMARK)) {
+        if (el.closest('agent-cursor-host')) continue;
+        const r = el.getBoundingClientRect();
+        if (!visible(el, r)) continue;
+        const nm = stableName(el);
+        let s = 0;
+        if (d.id && el.id === d.id) s += 6;
+        if (d.name && nm === d.name) s += 6;
+        else if (d.name && nm && nm.toLowerCase().includes(d.name.toLowerCase().slice(0, 40))) s += 2;
+        if (role(el) === d.role) s += 3;
+        if (d.href && el.getAttribute('href') === d.href) s += 4;
+        if (d.field && el.getAttribute('name') === d.field) s += 5;
+        if (d.placeholder && el.getAttribute('placeholder') === d.placeholder) s += 3;
+        if (s > bestS) { bestS = s; best = el; }
+      }
+      return best && bestS >= 6 ? { ref: refOf(best), score: bestS } : null;
     },
 
     get(ref) { return refs.get(ref) || null; },

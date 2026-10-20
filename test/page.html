@@ -25,5 +25,21 @@ customElements.define('my-widget', class extends HTMLElement {
 <button id="openModal" onclick="modal.style.display='block'">Abrir modal</button>
 <div id="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4)"><button onclick="modal.style.display='none'" style="margin:200px auto;display:block">Cerrar modal</button></div>
 <p><a id="blank" href="about:blank" target="_blank">Pestaña nueva</a> <button id="pop" onclick="window.open('about:blank')">Abrir popup</button></p>
+<table id="tabla"><thead><tr><th>Producto</th><th>Precio</th><th>Stock</th></tr></thead>
+<tbody><tr><td><a href="/teclado">Teclado</a></td><td>$49.00</td><td>12</td></tr>
+<tr><td>Ratón</td><td>$19.90</td><td>=1+1</td></tr><tr><td>Monitor, 27"</td><td>$289.00</td><td>3</td></tr></tbody></table>
+<div id="cards">
+  <div class="card"><h3>Silla ergonómica</h3><img src="silla.png" alt="silla"><span>$129.99</span><a href="/silla">Ver</a> <p>Respaldo de malla y reposabrazos ajustables.</p></div>
+  <div class="card"><h3>Escritorio elevable</h3><span>$349.00</span><a href="/escritorio">Ver</a> <p>Motor doble, memoria de cuatro alturas.</p></div>
+  <div class="card"><h3>Lámpara LED</h3><span>$39.50</span><a href="/lampara">Ver</a> <p>Luz cálida y fría con regulador táctil.</p></div>
+  <div class="card"><h3>Alfombrilla XL</h3><span>$15.00</span><a href="/alfombrilla">Ver</a> <p>Base de goma antideslizante, 90 × 40 cm.</p></div>
+</div>
+<form id="saludar" onsubmit="return false">
+  <label for="nombre">Nombre</label> <input id="nombre" name="nombre">
+  <label for="plan">Plan</label> <select id="plan"><option>Gratis</option><option>Pro</option></select>
+  <label for="clave">Clave</label> <input id="clave" type="password">
+  <button type="button" onclick="saludo.textContent = 'Hola, ' + nombre.value + ' (' + plan.value + ')'">Saludar</button>
+  <span id="saludo"></span>
+</form>
 <p id="far"><a href="#top" onclick="this.textContent='enlace lejano pulsado';return false">Enlace lejano</a></p>
 </body></html>

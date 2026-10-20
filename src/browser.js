@@ -53,6 +53,7 @@ export class AgentBrowser {
     this.prevPages = [];             // pila de pestañas activas anteriores (para volver al cerrar)
     this.openers = new WeakMap();    // page -> page que la abrió
     this.ownPending = 0;             // pestañas que está creando el propio agente (browser_tabs new)
+    this.hud = { on: process.env.AGENT_HUD === '1', stats: null }; // contador de tokens en pantalla
     const allow = process.env.AGENT_ALLOWED_ORIGINS;
     this.allowed = allow ? allow.split(',').map(h => h.trim().toLowerCase()).filter(Boolean) : null;
   }
@@ -164,10 +165,11 @@ export class AgentBrowser {
       const file = path.join(this.opts.downloadsDir, dl.suggestedFilename());
       try { await dl.saveAs(file); this.events.push({ type: 'download', file }); } catch (e) { this.events.push({ type: 'download-error', error: String(e) }); }
     });
-    // Tras cada navegación, devolver el cursor a donde estaba
+    // Tras cada navegación, devolver el cursor a donde estaba (y el contador de tokens)
     page.on('load', () => {
       const c = this.cursor.get(page);
       if (c) page.evaluate(([x, y]) => window.__agentCursor?.move(x, y), [c.x, c.y]).catch(() => {});
+      if (this.hud.on && this.hud.stats) this.showHud(page).catch(() => {});
     });
     page.on('close', () => { if (this.page === page) this.page = this._fallback(page); });
   }
@@ -305,6 +307,11 @@ export class AgentBrowser {
 
   async annotate(page, text, rect) {
     await page.evaluate(([t, r]) => { const c = window.__agentCursor; if (!c) return; if (t) c.say(t); if (r) c.highlight(r); }, [text, rect]).catch(() => {});
+  }
+
+  async showHud(page) {
+    const s = this.hud.on ? this.hud.stats || { ratio: 0, used: 0, shots: 0, calls: 0 } : null;
+    await page.evaluate(v => window.__agentCursor?.hud(v), s).catch(() => {});
   }
 
   async elementAt(x, y) {

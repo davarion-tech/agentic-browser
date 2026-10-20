@@ -7,14 +7,29 @@ import os from 'node:os';
 import path from 'node:path';
 import { formatSnapshot, diffSnapshot } from './perception.js';
 import { Recorder } from './recorder.js';
+import { Teacher } from './teach.js';
 
 const TRACE = process.env.AGENT_TRACE || path.join(os.homedir(), '.agentic-browser', 'trace.jsonl');
+const EXPORTS = process.env.AGENT_EXPORTS || path.join(os.homedir(), '.agentic-browser', 'exports');
 const READONLY = process.env.AGENT_READONLY === '1';
 // Acciones de entrada: solo los popups que abran ellas pasan a ser la pestaña activa
-const INPUT = new Set(['browser_click', 'browser_type', 'browser_press', 'browser_drag', 'browser_select', 'browser_upload']);
-const MUTATING = new Set(['browser_click', 'browser_type', 'browser_press', 'browser_drag', 'browser_select', 'browser_upload', 'browser_eval']);
+const INPUT = new Set(['browser_click', 'browser_type', 'browser_press', 'browser_drag', 'browser_select', 'browser_upload', 'browser_replay']);
+const MUTATING = new Set(['browser_click', 'browser_type', 'browser_press', 'browser_drag', 'browser_select', 'browser_upload', 'browser_eval', 'browser_replay']);
 const CORE = ['browser_navigate', 'browser_snapshot', 'browser_find', 'browser_click', 'browser_type', 'browser_press',
-  'browser_scroll', 'browser_read', 'browser_element_at', 'browser_watch', 'browser_request_human', 'browser_tabs'];
+  'browser_scroll', 'browser_read', 'browser_extract', 'browser_element_at', 'browser_watch', 'browser_request_human', 'browser_tabs'];
+// Herramientas que "miran" la página: un agente basado en capturas haría una captura en cada una
+const PERCEIVE = new Set(['browser_snapshot', 'browser_find', 'browser_read', 'browser_extract', 'browser_element_at', 'browser_cursor']);
+const estTokens = s => Math.ceil(String(s).length / 4);
+
+// CSV seguro para Excel: comillas escapadas y sin fórmulas inyectadas desde la web
+function toCsv(cols, rows) {
+  const cell = v => {
+    let s = v == null ? '' : String(v);
+    if (/^[=+\-@\t\r]/.test(s) && !/^-?\d/.test(s)) s = "'" + s;
+    return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  return [cols.map(cell).join(','), ...rows.map(r => cols.map(c => cell(r[c])).join(','))].join('\n');
+}
 
 const ref = z.union([z.string(), z.number()]).optional()
   .describe('Ref de un elemento devuelto por browser_snapshot/browser_find (ej. 12 o "f1:7" en iframes)');
@@ -36,6 +51,11 @@ function brief(d) {
 
 export function createTools(ab) {
   const recorder = new Recorder(ab);
+  const teacher = new Teacher(ab);
+  // Contador de tokens: lo que devolvemos frente a lo que costaría una captura por cada percepción.
+  // Captura = ancho × alto / 750 tokens (la fórmula de imágenes de Claude): 1280×800 ≈ 1.365.
+  const meter = { calls: 0, used: 0, shots: 0, perceptions: 0 };
+  let replaySteps = 0;
 
   async function settle(page, before) {
     await sleep(120);
@@ -276,6 +296,40 @@ export function createTools(ab) {
       },
     },
     {
+      name: 'browser_extract',
+      description: 'Datos estructurados en UNA llamada: convierte la tabla o la lista repetida más relevante (productos, resultados, contactos) en filas JSON o CSV, con título, enlace, precio e imagen. Limítalo con ref o selector. Con file lo guarda en disco y solo devuelve un resumen.',
+      schema: {
+        ref, selector: z.string().optional().describe('Contenedor CSS donde buscar'),
+        kind: z.enum(['auto', 'table', 'list']).optional().describe('auto (por defecto) elige la tabla o lista con más contenido'),
+        format: z.enum(['json', 'csv']).optional(),
+        max: z.number().optional().describe('Máximo de filas (100)'),
+        file: z.string().optional().describe('Guardar en este archivo (relativo a ~/.agentic-browser/exports)'),
+      },
+      async run({ ref: r, selector, kind = 'auto', format = 'json', max = 100, file }) {
+        const page = await ab.active();
+        let frame = page.mainFrame(), id;
+        if (r !== undefined && r !== '') {
+          const p = ab.parseRef(r);
+          const fr = (await ab.frames(page)).find(f => f.id === p.fid);
+          if (!fr) throw new Error(`frame f${p.fid} ya no existe; vuelve a llamar a snapshot`);
+          frame = fr.frame; id = p.id;
+        }
+        await ab.ensure(frame);
+        const d = await frame.evaluate(o => window.__agentPerc.extract(o), { ref: id, selector, kind, max });
+        if (d.error) throw new Error(d.error);
+        const body = format === 'csv' ? toCsv(d.columns, d.rows) : '[\n' + d.rows.map(x => JSON.stringify(x)).join(',\n') + '\n]';
+        const head = `${d.kind === 'table' ? 'tabla' : 'lista'}: ${d.rows.length} filas${d.total > d.rows.length ? ` de ${d.total}` : ''} · columnas: ${d.columns.join(', ')}`;
+        if (file) {
+          const out = path.resolve(EXPORTS, file);
+          fs.mkdirSync(path.dirname(out), { recursive: true });
+          fs.writeFileSync(out, body);
+          return `${head}\nguardado en ${out}`;
+        }
+        // Delimitado: el contenido de la web son datos de terceros, no instrucciones
+        return `${head}\n<page_data url="${page.url()}" trust="untrusted">\n${body}\n</page_data>`;
+      },
+    },
+    {
       name: 'browser_eval',
       description: 'Ejecuta JavaScript en la página y devuelve el resultado (JSON).',
       schema: { expression: z.string() },
@@ -358,12 +412,99 @@ export function createTools(ab) {
     },
     {
       name: 'browser_cursor_style',
-      description: 'Muestra/oculta el cursor visual o su estela.',
-      schema: { visible: z.boolean().optional(), trail: z.boolean().optional() },
-      async run({ visible, trail }) {
+      description: 'Muestra/oculta el cursor visual, su estela o el contador de tokens en vivo (hud) en la esquina de la página.',
+      schema: { visible: z.boolean().optional(), trail: z.boolean().optional(), hud: z.boolean().optional().describe('Contador de tokens frente a capturas, visible para quien mira') },
+      async run({ visible, trail, hud }) {
         const page = await ab.active();
         await page.evaluate(([v, t]) => { const c = window.__agentCursor; if (!c) return; if (v === true) c.show(); if (v === false) c.hide(); if (t !== undefined && t !== null) c.trail(t); }, [visible, trail]);
+        if (hud !== undefined) { ab.hud.on = hud; await ab.showHud(page); }
         return 'ok';
+      },
+    },
+    {
+      name: 'browser_stats',
+      description: 'Tokens que ha devuelto agentic-browser en esta sesión frente a lo que habrían costado las capturas de pantalla (una por cada percepción, ancho×alto/750).',
+      schema: { reset: z.boolean().optional() },
+      async run({ reset }) {
+        const s = stats();
+        if (reset) { Object.assign(meter, { calls: 0, used: 0, shots: 0, perceptions: 0 }); ab.hud.stats = null; }
+        return JSON.stringify({ ...s, method: 'tokens ≈ caracteres/4; captura ≈ ancho×alto/750 por cada percepción (snapshot, find, read, extract, element_at, cursor, snapshot:true y cada paso de una receta)' });
+      },
+    },
+    {
+      name: 'browser_teach_start',
+      description: 'MODO ENSEÑAR. Empieza a grabar una receta: la persona hace la tarea una vez en el Chrome del agente (clics, textos, selecciones, Enter) y pulsa "Terminar" en el banner. Se guarda por rol y nombre de cada elemento, no por píxeles. Las contraseñas nunca se graban. Después llama a browser_teach_stop.',
+      schema: { name: z.string().describe('Nombre corto de la receta, ej. "buscar-factura"'), url: z.string().optional().describe('Página donde empieza la tarea') },
+      async run({ name, url }) {
+        const page = await ab.active();
+        if (url) await tools.find(t => t.name === 'browser_navigate').run({ url });
+        await page.bringToFront().catch(() => {});
+        await teacher.start(name, await ab.active());
+        return `grabando la receta "${name}" en ${page.url()}. Pide a la persona que haga la tarea en el navegador y pulse "Terminar" en el banner; luego llama a browser_teach_stop (espera a que termine).`;
+      },
+    },
+    {
+      name: 'browser_teach_stop',
+      description: 'Termina la grabación de browser_teach_start. Por defecto espera a que la persona pulse "Terminar" (o "Cancelar"). Guarda la receta y devuelve sus pasos y parámetros.',
+      schema: { wait: z.boolean().optional().describe('Esperar al botón Terminar (true); false corta ya'), timeout: z.number().optional().describe('ms (600000)') },
+      async run({ wait, timeout }) {
+        const r = await teacher.stop({ wait, timeout });
+        if (r.cancelled) return 'la persona canceló: no se guardó nada';
+        if (r.empty) return `no se grabó ningún paso${r.how === 'timeout' ? ' (se agotó el tiempo)' : ''}`;
+        return `${teacher.summary(r.recipe)}\nguardada en ${r.file}${r.how === 'timeout' ? ' (se agotó el tiempo; se guardó lo grabado)' : ''}\nRepítela con browser_replay {name: "${r.recipe.name}", params: {...}}`;
+      },
+    },
+    {
+      name: 'browser_recipes',
+      description: 'Lista las recetas grabadas o, con name, muestra sus pasos y parámetros.',
+      schema: { name: z.string().optional() },
+      async run({ name }) {
+        if (name) return teacher.summary(teacher.load(name));
+        const all = teacher.list();
+        return all.length ? all.map(r => `${r.name} — ${r.steps.length} pasos, params: ${Object.keys(r.params).join(', ') || 'ninguno'} · ${r.startUrl}`).join('\n') : '(sin recetas; graba una con browser_teach_start)';
+      },
+    },
+    {
+      name: 'browser_replay',
+      description: 'Repite una receta grabada. Localiza cada elemento por rol y nombre y ejecuta los pasos sin percibir la página: casi no gasta tokens. params cambia los textos escritos, ej. {"buscar": "facturas octubre"}. Los campos secretos (contraseñas) siempre los escribe la persona.',
+      schema: { name: z.string(), params: z.record(z.string(), z.string()).optional(), snapshot: snap },
+      async run({ name, params = {}, snapshot }) {
+        const recipe = teacher.load(name);
+        const run = n => args => tools.find(t => t.name === n).run(args);
+        const unknown = Object.keys(params).filter(k => !(k in recipe.params));
+        const values = { ...recipe.params, ...params };
+        const log = [];
+        replaySteps = 0;
+        let page = await ab.active();
+        if (/^(https?|file):/.test(recipe.startUrl) && page.url() !== recipe.startUrl) await run('browser_navigate')({ url: recipe.startUrl });
+        for (const [i, st] of recipe.steps.entries()) {
+          const tag = `${i + 1}/${recipe.steps.length}`;
+          try {
+            page = await ab.active();
+            if (st.action === 'goto') await run('browser_navigate')({ url: st.url });
+            else if (st.action === 'press') await run('browser_press')({ keys: st.key });
+            else {
+              const ref = await teacher.locate(page, st.target);
+              if (!ref) throw new Error(`no encuentro ${st.target.role} "${st.target.name}" en ${page.url()}`);
+              if (st.action === 'click') await run('browser_click')({ ref });
+              else if (st.action === 'select') await run('browser_select')({ ref, values: st.value });
+              else if (st.secret) {
+                await run('browser_click')({ ref });
+                const h = await ab.requestHuman(`Escribe ${st.target.name || 'el dato secreto'} en el campo marcado y pulsa “Listo”`);
+                if (h !== 'done') throw new Error(`la persona no completó el campo (${h})`);
+              } else await run('browser_type')({ ref, text: String(values[st.param] ?? ''), clear: true });
+            }
+            replaySteps++;
+            log.push(`✓ ${tag} ${teacher.describe(st, values)}`);
+          } catch (e) {
+            log.push(`✗ ${tag} ${teacher.describe(st, values)} — ${e.message}`, 'Se detuvo aquí. Mira la página con browser_snapshot y sigue a mano, o vuelve a grabar la receta.');
+            break;
+          }
+        }
+        page = await ab.active();
+        if (unknown.length) log.push(`⚠ params desconocidos ignorados: ${unknown.join(', ')} (la receta usa: ${Object.keys(recipe.params).join(', ') || 'ninguno'})`);
+        log.unshift(`receta "${recipe.name}": ${replaySteps}/${recipe.steps.length} pasos`);
+        return after(page, page.url(), log.join('\n') + `\n→ "${await page.title()}" ${page.url()}`, snapshot);
       },
     },
     {
@@ -402,6 +543,27 @@ export function createTools(ab) {
     },
   ];
 
+  function shotTokens() {
+    const vp = (ab.page && !ab.page.isClosed() && ab.page.viewportSize()) || ab.opts.viewport;
+    return Math.round((vp.width * vp.height) / 750);
+  }
+  function stats() {
+    return { calls: meter.calls, tokensUsed: meter.used, screenshotEquivalent: meter.shots,
+      ratio: meter.used ? +(meter.shots / meter.used).toFixed(2) : 0, perceptions: meter.perceptions, tokensPerScreenshot: shotTokens() };
+  }
+  function count(name, args, out) {
+    if (name === 'browser_stats') return;
+    const shot = shotTokens();
+    const used = out?.image ? shot : typeof out === 'string' ? estTokens(out) : 0;
+    let perceptions = PERCEIVE.has(name) || args.snapshot ? 1 : 0;
+    if (name === 'browser_replay') perceptions += replaySteps;
+    meter.calls++;
+    meter.used += used;
+    meter.perceptions += perceptions;
+    // Con capturas: la misma respuesta de acción (sin el snapshot) + una imagen por cada percepción
+    meter.shots += out?.image ? shot : perceptions ? perceptions * shot + (args.snapshot ? 20 : 0) : used;
+  }
+
   // Envoltorio común: modo solo-lectura, detector de bucles y traza de auditoría
   let lastSig = '', repeats = 0;
   const shorten = v => (typeof v === 'string' && v.length > 200 ? v.slice(0, 200) + '…' : v);
@@ -421,6 +583,12 @@ export function createTools(ab) {
       } catch (e) { ok = false; out = e.message; throw e; }
       finally {
         if (INPUT.has(t.name)) ab.markAction();
+        count(t.name, args, out);
+        if (ab.hud.on && ab.page && !ab.page.isClosed()) {
+          const s = stats();
+          ab.hud.stats = { ratio: s.ratio, used: s.tokensUsed, shots: s.screenshotEquivalent, calls: s.calls };
+          await ab.showHud(ab.page);
+        }
         const rec = { at: new Date().toISOString(), tool: t.name, args: Object.fromEntries(Object.entries(args).map(([k, v]) => [k, shorten(v)])),
           ms: Date.now() - t0, url: ab.page && !ab.page.isClosed() ? ab.page.url() : null, ok,
           result: typeof out === 'string' ? out.slice(0, 200) : out?.image ? '[imagen]' : null };

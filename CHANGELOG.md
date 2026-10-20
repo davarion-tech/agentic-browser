@@ -3,6 +3,16 @@
 All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## [1.1.0] - 2026-10-20
+
+### Added
+- **Teach mode.** `browser_teach_start` / `browser_teach_stop` record a task the person performs once in the agent's Chrome (clicks, typed text, selects, Enter, typed URLs) behind a "Recording" banner with Finish/Cancel buttons. Steps are stored as recipes (`~/.agentic-browser/recipes`, `AGENT_RECIPES`) by role, name, id, href or field name instead of pixels. Typed text becomes a parameter with the recorded value as default. Password and one-time-code fields are never recorded.
+- `browser_replay` repeats a recipe with new `params`, locating each element again across frames and without perceiving the page at every step. Secret fields are handed to the person with `browser_request_human`. It stops at the first step it cannot complete and says which one.
+- `browser_recipes` lists recipes or shows one with its steps and parameters.
+- `browser_extract` returns the most relevant table or repeated list as JSON or CSV rows (title, url, price, image, text for lists; one column per header for tables, with rowspan/colspan and footnote marks resolved). It can save to disk (`file`, `AGENT_EXPORTS`). CSV output escapes quotes and neutralizes spreadsheet formulas.
+- Live token counter: `browser_cursor_style({ hud: true })` or `AGENT_HUD=1` draws a corner panel with tokens used, the screenshot equivalent and the ratio. `browser_stats` returns the same numbers.
+- `browser_extract` joins the `core` tool set (13 tools).
+
 ## [1.0.1] - 2026-10-16
 
 ### Fixed

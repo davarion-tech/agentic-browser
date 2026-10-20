@@ -129,6 +129,12 @@ viewport 1280x800 scroll=0,0 docH=2090
 [f1:1] button "Button inside iframe" @214,217
 ```
 
+## New in 1.1
+
+- **Teach it once, replay forever.** `browser_teach_start` records a task while *you* do it in the agent's Chrome (clicks, text, selects, Enter). It is saved as a recipe of roles and names, not pixels, so it survives layout changes. `browser_replay` repeats it with new values (`{"search": "October invoices"}`) without perceiving every step. Passwords are never recorded: on replay, the person types them.
+- **Structured data in one call.** `browser_extract` turns the most relevant table or repeated list (products, search results, contacts) into JSON or CSV rows with title, link, price and image. Merged table headers are resolved. CSV output is safe to open in Excel.
+- **Live token counter.** `browser_cursor_style({ hud: true })` (or `AGENT_HUD=1`) shows, in the corner of the page, the tokens used against what screenshots would have cost. `browser_stats` returns the same numbers. Formula: tokens ≈ characters / 4; one screenshot ≈ width × height / 750 per perception call.
+
 ## Tools
 
 | Tool | Purpose |
@@ -143,10 +149,14 @@ viewport 1280x800 scroll=0,0 docH=2090
 | `browser_select` / `browser_upload` | `<select>` options; file inputs |
 | `browser_navigate` / `browser_history` / `browser_tabs` | Navigation and tabs |
 | `browser_read` / `browser_eval` | Readable text (wrapped as untrusted content); arbitrary JS |
+| `browser_extract` | Table or repeated list → JSON or CSV rows (title, url, price, image…). `file` saves it to disk |
+| `browser_teach_start` / `browser_teach_stop` | Record a task the person performs once, as a reusable recipe |
+| `browser_recipes` / `browser_replay` | List or show recipes; replay one with new `params` at almost zero tokens |
+| `browser_stats` | Tokens used this session vs. the screenshot equivalent |
 | `browser_wait` / `browser_watch` | Wait for time, text or selector. `browser_watch` sleeps at **zero tokens** until the page changes (new message, title "(3) Inbox"…) |
 | `browser_request_human` | Hand control to the person watching (login, 2FA, CAPTCHA, a decision) through an on-page banner |
 | `browser_console` / `browser_events` / `browser_trace` | JS console and errors; dialogs, downloads and new tabs; audit trail of every action |
-| `browser_cursor_style` | Show or hide the cursor or its trail |
+| `browser_cursor_style` | Show or hide the cursor, its trail or the live token counter (`hud`) |
 | `browser_record_start` / `browser_record_stop` | Record the active tab as a video, red cursor included, for demo clips without OBS. MP4 (H.264) when `ffmpeg` is on the PATH, otherwise WebM. Returns path, duration and size |
 | `browser_screenshot` | Last resort: JPEG of the page or of a single `ref` |
 
@@ -163,7 +173,10 @@ Most actions accept `snapshot: true` and return the new page state in the same r
 | `AGENT_PROFILE` | `~/.agentic-browser/profile` | Persistent agent profile (cookies and logins survive restarts) |
 | `AGENT_DOWNLOADS` | `~/.agentic-browser/downloads` | Download folder |
 | `AGENT_CURSOR_SPEED` | `120` | ms per 100 px of cursor travel; `0` = instant |
-| `AGENT_TOOLS` | `all` | `core` (12 essential tools) or a comma-separated list. Fewer tools means fewer prompt tokens |
+| `AGENT_TOOLS` | `all` | `core` (13 essential tools) or a comma-separated list. Fewer tools means fewer prompt tokens |
+| `AGENT_HUD` | `0` | `1` shows the live token counter from the start |
+| `AGENT_RECIPES` | `~/.agentic-browser/recipes` | Where taught recipes are saved (JSON) |
+| `AGENT_EXPORTS` | `~/.agentic-browser/exports` | Where `browser_extract` writes files |
 | `AGENT_READONLY` | `0` | `1` disables every tool that changes a page |
 | `AGENT_ALLOWED_ORIGINS` | — | Domain allowlist, e.g. `wikipedia.org,localhost` (subdomains included) |
 | `AGENT_DIALOGS` | `accept` | `alert/confirm/prompt`: `accept` or `dismiss` |
@@ -186,6 +199,7 @@ Most actions accept `snapshot: true` and return the new page state in the same r
 Based on the most common complaints about browser agents (stale refs, token bloat, popups, multi-agent conflicts, prompt injection, observability):
 
 - [x] Reference **chat watcher** for agent-owned accounts: wakes on new messages at zero tokens and replies under a code-enforced policy (draft by default, allowlist, sensitive keywords, rate limit, domain lock). See [docs/WATCHER.md](docs/WATCHER.md).
+- [x] Teach mode and recipe replay, structured extraction and a live token counter (1.1).
 - [ ] Multi-agent sessions on one profile, with tab ownership and leases.
 - [ ] `browser_batch`: several actions in one call.
 - [ ] Hidden-text detection (instructions hidden with CSS) as a prompt-injection signal.

@@ -14,7 +14,8 @@ const transport = new StdioClientTransport({
   command: process.execPath,
   args: [path.join(here, '..', 'src', 'mcp.js')],
   env: { ...process.env, AGENT_HEADLESS: process.env.AGENT_HEADLESS ?? '1',
-    AGENT_PROFILE: fs.mkdtempSync(path.join(os.tmpdir(), 'ab-')), AGENT_CURSOR_SPEED: '40' },
+    AGENT_PROFILE: fs.mkdtempSync(path.join(os.tmpdir(), 'ab-')), AGENT_CURSOR_SPEED: '40',
+    AGENT_RECIPES: fs.mkdtempSync(path.join(os.tmpdir(), 'ab-recipes-')), AGENT_EXPORTS: fs.mkdtempSync(path.join(os.tmpdir(), 'ab-exports-')) },
   stderr: 'inherit',
 });
 const client = new Client({ name: 'smoke', version: '1.0.0' });
@@ -103,6 +104,66 @@ assert.equal(w.reason, 'mutation');
 await call('browser_cursor'); await call('browser_cursor');
 assert.match(await call('browser_cursor'), /repetido esta misma acción 3 veces/);
 assert.match(await call('browser_trace', { limit: 3 }), /browser_cursor/);
+
+// browser_extract: tabla, lista repetida y CSV a disco
+const tbl = await call('browser_extract', { kind: 'table' });
+console.log(tbl.split('\n').slice(0, 3).join('\n'));
+assert.match(tbl, /^tabla: 3 filas · columnas: Producto, Producto_url, Precio, Stock/);
+assert.match(tbl, /"Producto":"Teclado","Producto_url":"file:\/\/\/[^"]*teclado"/);
+const cards = await call('browser_extract', { selector: '#cards' });
+assert.match(cards, /^lista: 4 filas/);
+assert.match(cards, /"title":"Silla ergonómica","url":"[^"]+\/silla","price":"\$129\.99","image":"[^"]+silla\.png"/);
+const csv = await call('browser_extract', { kind: 'table', format: 'csv', file: 'smoke/tabla.csv' });
+const csvFile = csv.match(/guardado en (.+)$/m)[1];
+const csvText = fs.readFileSync(csvFile, 'utf8');
+console.log(csvText);
+assert.match(csvText, /^Producto,Producto_url,Precio,Stock\n/);
+assert.match(csvText, /"Monitor, 27"""/);
+assert.match(csvText, /,'=1\+1/); // sin fórmulas inyectables en Excel
+
+// Contador de tokens: HUD visible y proporción frente a capturas
+await call('browser_cursor_style', { hud: true });
+await call('browser_snapshot');
+assert.equal(await call('browser_eval', { expression: 'window.__agentCursor.state().hud' }), 'true');
+const st = JSON.parse(await call('browser_stats'));
+console.log('stats:', st);
+assert.ok(st.ratio > 1 && st.perceptions > 5 && st.tokensPerScreenshot === 1365, JSON.stringify(st));
+
+// Modo enseñar: el "humano" (aquí, las propias herramientas) hace la tarea y pulsa Terminar
+console.log(await call('browser_teach_start', { name: 'smoke-saludo' }));
+assert.equal(await call('browser_eval', { expression: 'window.__agentCursor.state().teach' }), '"smoke-saludo"');
+await call('browser_type', { ref: (await call('browser_find', { query: 'Nombre' })).match(/\[(\d+)\] textbox/)[1], text: 'Ana' });
+await call('browser_select', { ref: (await call('browser_find', { query: 'Plan' })).match(/\[(\d+)\] select/)[1], values: ['Pro'] });
+await call('browser_click', { ref: (await call('browser_find', { query: 'Saludar' })).match(/\[(\d+)\] button/)[1] });
+assert.match(await call('browser_read', { selector: '#saludo' }), /Hola, Ana \(Pro\)/);
+await call('browser_eval', { expression: 'window.__agentTeachEmit({ ctrl: "done" }), 1' });
+const learned = await call('browser_teach_stop');
+console.log(learned);
+assert.match(learned, /receta "smoke_saludo" — 3 pasos/);
+assert.match(learned, /params \(valor grabado\): \{"nombre":"Ana"\}/);
+assert.match(learned, /1\. escribir \{\{nombre\}\} en textbox "Nombre"\n2\. elegir \["Pro"\] en select "Plan"\n3\. clic en button "Saludar"/);
+assert.equal(await call('browser_eval', { expression: 'window.__agentCursor.state().teach' }), 'null');
+assert.match(await call('browser_recipes'), /smoke_saludo — 3 pasos, params: nombre/);
+
+// Repetirla con otro valor, tras recargar la página
+await call('browser_history', { action: 'reload' });
+const replay = await call('browser_replay', { name: 'smoke-saludo', params: { nombre: 'Luis' } });
+console.log(replay);
+assert.match(replay, /receta "smoke_saludo": 3\/3 pasos/);
+assert.match(await call('browser_read', { selector: '#saludo' }), /Hola, Luis \(Pro\)/);
+assert.ok(JSON.parse(await call('browser_stats')).perceptions >= st.perceptions + 3);
+
+// Las contraseñas nunca se graban
+await call('browser_teach_start', { name: 'smoke-secreto' });
+await call('browser_type', { ref: (await call('browser_find', { query: 'Clave' })).match(/\[(\d+)\] password/)[1], text: 's3creta-123', submit: true });
+await call('browser_eval', { expression: 'window.__agentTeachEmit({ ctrl: "done" }), 1' });
+const secret = await call('browser_teach_stop');
+console.log(secret);
+assert.match(secret, /— 2 pasos[\s\S]*1\. dato secreto en password "Clave" \(lo escribe la persona\)\n2\. tecla Enter/);
+assert.doesNotMatch(fs.readFileSync(secret.match(/guardada en (.+)$/m)[1], 'utf8'), /s3creta/);
+await call('browser_cursor_style', { hud: false });
+assert.equal(await call('browser_eval', { expression: 'window.__agentCursor.state().hud' }), 'false');
+await call('browser_scroll', { dy: -5000 });
 
 // Grabación: unos segundos con movimiento y una pausa sin cambios (debe conservar su duración)
 const hasFfmpeg = spawnSync(process.env.AGENT_FFMPEG || 'ffmpeg', ['-version'], { stdio: 'ignore' }).status === 0;

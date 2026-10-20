@@ -119,6 +119,12 @@ npm run watcher
 
 Funciona con tu suscripción de Claude (`claude setup-token`) o con una API key. Lee antes [docs/WATCHER.md](docs/WATCHER.md) y el [Aviso de responsabilidad](DISCLAIMER.md): muchas plataformas prohíben los bots no oficiales.
 
+## Novedades de la 1.1
+
+- **Enséñalo una vez y se repite siempre.** `browser_teach_start` graba una tarea mientras *tú* la haces en el Chrome del agente (clics, textos, selecciones, Enter). Se guarda como receta de roles y nombres, no de píxeles, así que aguanta cambios de diseño. `browser_replay` la repite con valores nuevos (`{"buscar": "facturas de octubre"}`) sin percibir cada paso. Las contraseñas nunca se graban: al repetir, las escribe la persona.
+- **Datos estructurados en una llamada.** `browser_extract` convierte la tabla o lista repetida más relevante (productos, resultados, contactos) en filas JSON o CSV con título, enlace, precio e imagen. Resuelve cabeceras combinadas, y el CSV se puede abrir en Excel sin riesgo.
+- **Contador de tokens en vivo.** `browser_cursor_style({ hud: true })` (o `AGENT_HUD=1`) muestra en la esquina de la página los tokens usados frente a lo que habrían costado las capturas. `browser_stats` devuelve las mismas cifras. Fórmula: tokens ≈ caracteres / 4; una captura ≈ ancho × alto / 750 por cada percepción.
+
 ## Herramientas
 
 | Herramienta | Uso |
@@ -133,10 +139,14 @@ Funciona con tu suscripción de Claude (`claude setup-token`) o con una API key.
 | `browser_select` / `browser_upload` | Opciones de `<select>`; subida de archivos |
 | `browser_navigate` / `browser_history` / `browser_tabs` | Navegación y pestañas |
 | `browser_read` / `browser_eval` | Texto legible (marcado como contenido no confiable); JS arbitrario |
+| `browser_extract` | Tabla o lista repetida → filas JSON o CSV (título, url, precio, imagen…). `file` lo guarda en disco |
+| `browser_teach_start` / `browser_teach_stop` | Graba una tarea que la persona hace una vez, como receta reutilizable |
+| `browser_recipes` / `browser_replay` | Lista o muestra recetas; repite una con `params` nuevos casi sin gastar tokens |
+| `browser_stats` | Tokens usados en la sesión frente al equivalente en capturas |
 | `browser_wait` / `browser_watch` | Esperar tiempo, un texto o un selector. `browser_watch` espera con **cero tokens** hasta que la página cambia (mensaje nuevo, título "(3) Bandeja"…) |
 | `browser_request_human` | Pasa el control a la persona que mira (login, 2FA, CAPTCHA, una decisión) con un banner en la página |
 | `browser_console` / `browser_events` / `browser_trace` | Consola y errores JS; diálogos, descargas y pestañas nuevas; registro de auditoría de cada acción |
-| `browser_cursor_style` | Mostrar u ocultar el cursor o su estela |
+| `browser_cursor_style` | Mostrar u ocultar el cursor, su estela o el contador de tokens (`hud`) |
 | `browser_record_start` / `browser_record_stop` | Graba en vídeo la pestaña activa, con el cursor rojo, para clips de demo sin OBS. MP4 (H.264) si `ffmpeg` está en el PATH; si no, WebM. Devuelve ruta, duración y tamaño |
 | `browser_screenshot` | Último recurso: JPEG de la página o de un solo `ref` |
 
@@ -151,7 +161,10 @@ Funciona con tu suscripción de Claude (`claude setup-token`) o con una API key.
 | `AGENT_PROFILE` | `~/.agentic-browser/profile` | Perfil persistente del agente (cookies y sesiones sobreviven entre reinicios) |
 | `AGENT_DOWNLOADS` | `~/.agentic-browser/downloads` | Carpeta de descargas |
 | `AGENT_CURSOR_SPEED` | `120` | ms por cada 100 px de recorrido; `0` = instantáneo |
-| `AGENT_TOOLS` | `all` | `core` (12 esenciales) o una lista separada por comas. Menos herramientas, menos tokens en el prompt |
+| `AGENT_TOOLS` | `all` | `core` (13 esenciales) o una lista separada por comas. Menos herramientas, menos tokens en el prompt |
+| `AGENT_HUD` | `0` | `1` muestra el contador de tokens desde el inicio |
+| `AGENT_RECIPES` | `~/.agentic-browser/recipes` | Carpeta de las recetas enseñadas (JSON) |
+| `AGENT_EXPORTS` | `~/.agentic-browser/exports` | Carpeta donde `browser_extract` guarda archivos |
 | `AGENT_READONLY` | `0` | `1` desactiva toda herramienta que modifique la página |
 | `AGENT_ALLOWED_ORIGINS` | — | Lista blanca de dominios, p. ej. `wikipedia.org,localhost` (incluye subdominios) |
 | `AGENT_DIALOGS` | `accept` | `alert/confirm/prompt`: `accept` o `dismiss` |
@@ -174,6 +187,7 @@ Funciona con tu suscripción de Claude (`claude setup-token`) o con una API key.
 Basada en las quejas más frecuentes sobre los agentes de navegador (refs obsoletos, exceso de tokens, popups, conflictos entre agentes, inyección de instrucciones, observabilidad):
 
 - [x] **Vigilante de chats** para cuentas propias del agente: despierta con cero tokens ante mensajes nuevos y responde bajo una política aplicada en código (borrador por defecto, lista blanca, palabras sensibles, límite por hora, bloqueo de dominio). Ver [docs/WATCHER.md](docs/WATCHER.md).
+- [x] Modo enseñar y repetición de recetas, extracción estructurada y contador de tokens en vivo (1.1).
 - [ ] Sesiones multi-agente sobre un mismo perfil, con pestañas con dueño.
 - [ ] `browser_batch`: varias acciones en una sola llamada.
 - [ ] Detección de texto oculto con CSS como señal de inyección de instrucciones.
