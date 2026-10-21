@@ -1,0 +1,49 @@
+# Publica server.json en el registro oficial de MCP sin tokens personales:
+# el registro confía en la identidad OIDC que GitHub da a los workflows de este repo
+# (io.github.davarion-tech/*). Se ejecuta al subir un tag vX.Y.Z o a mano.
+name: Publish to MCP Registry
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      MCP_PUBLISHER_VERSION: "1.8.1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check that server.json matches package.json
+        run: |
+          pkg=$(node -p "require('./package.json').version")
+          srv=$(node -p "require('./server.json').version")
+          [ "$pkg" = "$srv" ] || { echo "package.json $pkg != server.json $srv"; exit 1; }
+
+      - name: Wait until npm has this version
+        run: |
+          v=$(node -p "require('./package.json').version")
+          for i in $(seq 1 30); do
+            npm view "agentic-browser-mcp@$v" version >/dev/null 2>&1 && exit 0
+            echo "waiting for agentic-browser-mcp@$v on npm..."; sleep 20
+          done
+          echo "agentic-browser-mcp@$v is not on npm yet"; exit 1
+
+      - name: Install mcp-publisher
+        run: |
+          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/download/v${MCP_PUBLISHER_VERSION}/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
+          ./mcp-publisher --version
+
+      - name: Log in with GitHub OIDC
+        run: ./mcp-publisher login github-oidc
+
+      - name: Publish
+        run: ./mcp-publisher publish
