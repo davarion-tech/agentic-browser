@@ -76,6 +76,10 @@ try {
   await call('browser_upload', { ref: fileRef, files: [path.join(allowed, 'factura.txt')] });
   assert.equal(await page.evaluate(() => document.getElementById('file').files[0]?.name), 'factura.txt');
   console.log('✔ subidas limitadas a AGENT_UPLOAD_DIRS');
+  // Si el clic falla o tarda, la espera del selector no puede quedar huérfana y tumbar el proceso
+  await assert.rejects(call('browser_upload', { ref: '9999', files: [path.join(allowed, 'factura.txt')] }), /obsoleto/);
+  await new Promise(r => setTimeout(r, 16000));
+  console.log('✔ un clic fallido en browser_upload no tumba el proceso');
 
   // 6. Diálogos: se cancelan por defecto y el texto llega como no confiable
   const r = await call('browser_click', { ref: refOf(s, /button "Borrar todo"/) });

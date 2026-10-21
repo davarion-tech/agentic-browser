@@ -301,9 +301,13 @@ export function createTools(ab) {
       async run({ ref: r, files }) {
         files = checkUpload(ab, files);
         const page = await ab.active();
-        const chooser = page.waitForEvent('filechooser', { timeout: 5000 });
+        // El error del selector se captura ya: si el clic tarda más que la espera (Drive), una
+        // promesa rechazada sin manejador tumbaría todo el proceso del MCP.
+        const chooser = page.waitForEvent('filechooser', { timeout: 15000 }).then(c => c, e => e);
         await tools.find(t => t.name === 'browser_click').run({ ref: r });
-        await (await chooser).setFiles(files);
+        const fc = await chooser;
+        if (fc instanceof Error) throw new Error(`el clic en ${r} no abrió el selector de archivos (${fc.message.split('\n')[0]})`);
+        await fc.setFiles(files);
         return `ok ${files.length} archivo(s) adjuntados`;
       },
     },

@@ -3,6 +3,11 @@
 All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## [1.1.1] - 2026-10-20
+
+### Fixed
+- `browser_upload` could crash the whole MCP/HTTP server. The file-chooser wait was created before the click with a 5 s timeout and no handler, so when the click failed or took longer than 5 s (common in Google Drive) the rejected promise was unhandled and Node exited. The wait now has a handler and a 15 s timeout, and a click that does not open a file chooser returns a clear error. Covered by `test/security.test.js`.
+
 ## [1.1.0] - 2026-10-20
 
 Security release. Upgrading is recommended for everyone using the HTTP API.
