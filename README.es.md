@@ -158,6 +158,7 @@ Funciona con tu suscripción de Claude (`claude setup-token`) o con una API key.
 | `AGENT_TRACE` | `~/.agentic-browser/trace.jsonl` | Registro de auditoría de cada llamada |
 | `AGENT_CHROME` | autodetectado | Ruta al navegador. Sirve cualquier Chromium: Chrome, Edge (se usa solo si no hay Chrome), Brave, Chromium |
 | `AGENT_HTTP_PORT` / `AGENT_TOKEN` | `8787` / generado | Puerto HTTP y token Bearer **obligatorio**. Sin `AGENT_TOKEN` se genera uno en `~/.agentic-browser/http-token` (ruta cambiable con `AGENT_TOKEN_FILE`). Se rechazan las peticiones que vienen de páginas web |
+| `AGENT_NO_SANDBOX` | `0` | `1` arranca Chrome sin su sandbox. Solo para Linux como root o contenedores donde el sandbox no arranca; reduce el aislamiento |
 | `AGENT_ALLOW_EVAL` | `0` | `1` activa `browser_eval` (desactivada por defecto: puede leer cookies y sacar datos) |
 | `AGENT_UPLOAD_DIRS` | carpeta de descargas | Carpetas desde las que `browser_upload` puede subir archivos, separadas por `;` en Windows y `:` en macOS/Linux |
 | `AGENT_RECORDINGS` | `~/.agentic-browser/recordings` | Carpeta donde `browser_record_stop` guarda los vídeos |

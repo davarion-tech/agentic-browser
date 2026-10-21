@@ -26,6 +26,16 @@ const call = (name, args = {}) => tools.get(name).run(args);
 const refOf = (text, re) => { const l = text.split('\n').find(l => re.test(l)); assert.ok(l, `no encuentro ${re} en:\n${text}`); return l.match(/\[([^\]]+)\]/)[1]; };
 
 try {
+  // 0. Chrome arranca CON sandbox (playwright-core lo quita por defecto con --no-sandbox)
+  {
+    const p = await ab.active();
+    await p.goto('chrome://version');
+    const cmd = await p.evaluate(() => document.getElementById('command_line')?.innerText || '');
+    assert.ok(cmd.length > 20, 'no se pudo leer la línea de comandos de Chrome');
+    assert.ok(!cmd.includes('--no-sandbox'), `Chrome arrancó sin sandbox: ${cmd.slice(0, 300)}`);
+    console.log('✔ Chrome arranca con sandbox (sin --no-sandbox)');
+  }
+
   // 1. Todo lo que viene de la web llega delimitado como no confiable
   const snap = await call('browser_navigate', { url: pathToFileURL(path.join(here, 'security.html')).href, snapshot: true });
   assert.match(snap, /<page_content url="file:[^"]*" trust="untrusted">/);

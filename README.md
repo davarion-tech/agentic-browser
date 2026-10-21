@@ -170,6 +170,7 @@ Most actions accept `snapshot: true` and return the new page state in the same r
 | `AGENT_TRACE` | `~/.agentic-browser/trace.jsonl` | Audit log of every tool call |
 | `AGENT_CHROME` | auto-detected | Path to the browser. Any Chromium browser works: Chrome, Edge (falls back to it automatically), Brave, Chromium |
 | `AGENT_HTTP_PORT` / `AGENT_TOKEN` | `8787` / generated | HTTP port and **required** Bearer token. Without `AGENT_TOKEN`, one is generated in `~/.agentic-browser/http-token` (path configurable with `AGENT_TOKEN_FILE`). Requests coming from web pages are rejected |
+| `AGENT_NO_SANDBOX` | `0` | `1` launches Chrome without its sandbox. Only for Linux as root or containers where the sandbox cannot start; it lowers isolation |
 | `AGENT_ALLOW_EVAL` | `0` | `1` enables `browser_eval` (off by default: it can read cookies and exfiltrate data) |
 | `AGENT_UPLOAD_DIRS` | downloads folder | Folders `browser_upload` may upload from, separated by `;` on Windows and `:` on macOS/Linux |
 | `AGENT_RECORDINGS` | `~/.agentic-browser/recordings` | Where `browser_record_stop` saves videos |

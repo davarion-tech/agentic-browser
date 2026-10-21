@@ -38,6 +38,7 @@ export class AgentBrowser {
       cursorSpeed: Number(process.env.AGENT_CURSOR_SPEED ?? 120),
       // Por defecto se CANCELAN (un confirm("¿Borrar?") nunca se acepta solo); el texto llega al agente en los eventos
       dialogs: process.env.AGENT_DIALOGS || 'dismiss',
+      noSandbox: process.env.AGENT_NO_SANDBOX === '1',
       viewport: { width: 1280, height: 800 },
       ...opts,
     };
@@ -91,6 +92,9 @@ export class AgentBrowser {
           viewport: this.opts.viewport,
           acceptDownloads: true,
           downloadsPath: this.opts.downloadsDir,
+          // Sandbox de Chrome ACTIVADO (playwright-core lo quita por defecto con --no-sandbox):
+          // aísla cada pestaña del sistema. Solo para Linux como root/Docker: AGENT_NO_SANDBOX=1
+          chromiumSandbox: !this.opts.noSandbox,
           args: ['--no-first-run', '--no-default-browser-check'],
         });
       } catch (e) {

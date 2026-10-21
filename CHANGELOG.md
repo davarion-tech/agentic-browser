@@ -3,6 +3,11 @@
 All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## [1.1.2] - 2026-10-21
+
+### Security
+- **Chrome's sandbox is now enabled.** playwright-core launches Chromium with `--no-sandbox` unless told otherwise, so Chrome showed "unsupported command-line flag: --no-sandbox" and every tab ran without the OS-level isolation that contains a compromised renderer. agentic-browser now launches with the sandbox on (also in `npm run doctor`). Set `AGENT_NO_SANDBOX=1` only where the sandbox cannot run (Linux as root, some containers). Covered by `test/security.test.js`.
+
 ## [1.1.1] - 2026-10-20
 
 ### Fixed
