@@ -507,17 +507,23 @@ export function createTools(ab) {
     },
     {
       name: 'browser_cursor_style',
-      description: 'Muestra/oculta el cursor visual, su estela o el contador de tokens en vivo (hud) en la esquina de la página.',
+      description: 'Muestra/oculta el cursor visual, su estela, el contador de tokens en vivo (hud) o la máscara de privacidad que difumina contactos y números al grabar o compartir pantalla.',
       schema: {
         visible: z.boolean().optional(), trail: z.boolean().optional(),
         hud: z.boolean().optional().describe('Contador de tokens frente a capturas, visible para quien mira'),
         teachButton: z.boolean().optional().describe('Botón flotante "Enseñar una tarea" en el borde izquierdo'),
+        privacy: z.union([z.string(), z.array(z.string())]).optional()
+          .describe('Difumina lo que no debe verse: "whatsapp", "telegram", "gmail", selectores CSS, o "off". Tú sigues leyendo la página igual'),
       },
-      async run({ visible, trail, hud, teachButton }) {
+      async run({ visible, trail, hud, teachButton, privacy }) {
         const page = await ab.active();
         await page.evaluate(([v, t, b]) => { const c = window.__agentCursor; if (!c) return; if (v === true) c.show(); if (v === false) c.hide();
           if (t !== undefined && t !== null) c.trail(t); if (b !== undefined && b !== null) c.teachButton(b); }, [visible, trail, teachButton]);
         if (hud !== undefined) { ab.hud.on = hud; await ab.showHud(page); }
+        if (privacy !== undefined) {
+          const rules = await ab.setPrivacy(privacy);
+          return rules.length ? `ok: máscara de privacidad con ${rules.length} reglas` : 'ok: máscara de privacidad apagada';
+        }
         return 'ok';
       },
     },

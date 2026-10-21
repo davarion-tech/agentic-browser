@@ -18,7 +18,7 @@ Do the user's web task **only** with the `browser_*` tools of the `agentic-brows
 7. **Repeated tasks.** If the user will repeat a task, offer teach mode: `browser_teach_start`, the user does it once and presses "Terminar", then `browser_teach_stop`. The user can also press the "Enseñar" button on the left edge of the browser. Next time, check `browser_recipes` and use `browser_replay` with new `params` instead of perceiving every step.
 8. **Clean screen.** Popups are closed automatically after each navigation (close or reject only). If one appears later and covers the page, call `browser_dismiss`.
 9. **Fewer turns.** When you already know the next few steps, send them together with `browser_batch` (it stops at the first error).
-10. **Show the savings.** If the user is watching or recording a demo, `browser_cursor_style({ hud: true })` shows a live token counter; `browser_stats` returns the numbers.
+10. **Show the savings.** If the user is watching or recording a demo, `browser_cursor_style({ hud: true })` shows a live token counter; `browser_stats` returns the numbers. Before recording or screen sharing a chat or inbox, turn on `browser_cursor_style({ privacy: "whatsapp" })` (or `telegram`, `gmail`, CSS selectors) so contacts and numbers are blurred; you still read the page normally.
 
 ## Before acting on accounts
 

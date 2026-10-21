@@ -135,6 +135,7 @@ viewport 1280x800 scroll=0,0 docH=2090
 - **An "Enseñar" (teach) button in the browser.** A small tab on the left edge of the agent's Chrome starts a recording without asking the agent. Name the recipe in the banner, press Finish, then tell your agent "repeat <name>". Disable it with `AGENT_TEACH_BUTTON=0`.
 - **A clean screen.** Chrome's translate bar, search-engine choice, restore-pages bubble and permission prompts are off (permissions are denied). After every navigation, website popups (language, newsletter, cookie banners, "Sign in with Google") are closed with visible clicks on their close or reject button, never accept, subscribe or sign in. `browser_dismiss` does it on demand; `AGENT_AUTO_DISMISS=0` turns the automatic pass off.
 - **Structured data in one call.** `browser_extract` turns the most relevant table or repeated list (products, search results, contacts) into JSON or CSV rows with title, link, price and image. Merged table headers are resolved. CSV output is safe to open in Excel.
+- **Privacy mask** *(next release, on `main`)*. `browser_cursor_style({ privacy: "whatsapp" })` or `AGENT_PRIVACY=whatsapp` blurs contacts, chat headers and profile photos so you can record or share the agent's screen without exposing anyone. Presets: `whatsapp`, `telegram`, `gmail`, or your own CSS selectors. The agent still reads everything.
 - **Live token counter.** `browser_cursor_style({ hud: true })` (or `AGENT_HUD=1`) shows, in the corner of the page, the tokens used against what screenshots would have cost. `browser_stats` returns the same numbers. Formula: tokens ≈ characters / 4; one screenshot ≈ width × height / 750 per perception call.
 
 ## Tools
@@ -183,6 +184,7 @@ Most actions accept `snapshot: true` and return the new page state in the same r
 | `AGENT_AUTO_DISMISS` | `1` | `0` stops closing website popups after each navigation |
 | `AGENT_TEACH_BUTTON` | `1` | `0` hides the floating "Enseñar" button |
 | `AGENT_HUD` | `0` | `1` shows the live token counter from the start |
+| `AGENT_PRIVACY` | — | Privacy mask from the start: `whatsapp`, `telegram`, `gmail` and/or CSS selectors, comma-separated |
 | `AGENT_RECIPES` | `~/.agentic-browser/recipes` | Where taught recipes are saved (JSON) |
 | `AGENT_EXPORTS` | `~/.agentic-browser/exports` | Where `browser_extract` writes files |
 | `AGENT_READONLY` | `0` | `1` disables every tool that changes a page |

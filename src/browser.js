@@ -7,6 +7,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { overlayScript } from './overlay.js';
 import { perceptionScript } from './perception.js';
+import { privacyRules } from './privacy.js';
 
 const CHROME_CANDIDATES = [
   process.env.AGENT_CHROME,
@@ -77,6 +78,7 @@ export class AgentBrowser {
     this.openers = new WeakMap();    // page -> page que la abrió
     this.ownPending = 0;             // pestañas que está creando el propio agente (browser_tabs new)
     this.hud = { on: process.env.AGENT_HUD === '1', stats: null }; // contador de tokens en pantalla
+    this.privacy = privacyRules(process.env.AGENT_PRIVACY);         // máscara de privacidad (AGENT_PRIVACY=whatsapp)
     const allow = process.env.AGENT_ALLOWED_ORIGINS;
     this.allowed = allow ? allow.split(',').map(h => h.trim().toLowerCase()).filter(Boolean) : null;
   }
@@ -136,6 +138,7 @@ export class AgentBrowser {
     await this.context.addInitScript(on => { window.__agentTeachButton = on; }, process.env.AGENT_TEACH_BUTTON !== '0' && !this.opts.headless);
     await this.context.addInitScript(this.overlay);
     await this.context.addInitScript(this.perception);
+    if (this.privacy.length) await this.context.addInitScript(r => window.__agentCursor?.privacy(r), this.privacy);
     this.context.on('page', p => this._onPage(p));
     this.context.on('close', () => { this.context = null; this.page = null; });
     for (const p of this.context.pages()) this._wire(p);
@@ -351,6 +354,16 @@ export class AgentBrowser {
   async showHud(page) {
     const s = this.hud.on ? this.hud.stats || { ratio: 0, used: 0, shots: 0, calls: 0 } : null;
     await page.evaluate(v => window.__agentCursor?.hud(v), s).catch(() => {});
+  }
+
+  // Cambia la máscara en todas las pestañas. El init script nuevo corre tras los anteriores,
+  // así que los documentos que se abran después nacen ya con la última máscara (sin destellos).
+  async setPrivacy(spec) {
+    this.privacy = privacyRules(spec);
+    await this.start();
+    await this.context.addInitScript(r => window.__agentCursor?.privacy(r), this.privacy);
+    for (const p of this.context.pages()) await p.evaluate(r => window.__agentCursor?.privacy(r), this.privacy).catch(() => {});
+    return this.privacy;
   }
 
   async elementAt(x, y) {

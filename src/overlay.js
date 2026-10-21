@@ -179,6 +179,23 @@ export const overlayScript = String.raw`
     setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 450); }, ms || 6000);
   }
 
+  // Máscara de privacidad: difumina en la página (no en el overlay) lo que no debe verse al
+  // grabar. Hoja adoptada: funciona con CSP y Trusted Types y se aplica antes de pintar.
+  let privRules = [], privSheet = null;
+  function applyPrivacy() {
+    try {
+      const host = location.hostname;
+      const sels = privRules.filter(r => !r.hosts || r.hosts.some(h => host === h || host.endsWith('.' + h))).map(r => r.sel);
+      if (!privSheet) privSheet = new CSSStyleSheet();
+      privSheet.replaceSync('');
+      for (const s of sels) { try { privSheet.insertRule(s + '{filter:blur(10px) !important}', privSheet.cssRules.length); } catch {} }
+      const list = document.adoptedStyleSheets, has = list.includes(privSheet);
+      if (privSheet.cssRules.length && !has) document.adoptedStyleSheets = [...list, privSheet];
+      if (!privSheet.cssRules.length && has) document.adoptedStyleSheets = list.filter(x => x !== privSheet);
+    } catch {}
+  }
+  function privacy(rules) { privRules = Array.isArray(rules) ? rules : []; applyPrivacy(); return privSheet ? privSheet.cssRules.length : 0; }
+
   function resize() {
     if (!trailCanvas) return;
     const dpr = window.devicePixelRatio || 1;
@@ -259,7 +276,11 @@ export const overlayScript = String.raw`
   addEventListener('resize', resize);
   document.addEventListener('DOMContentLoaded', mount);
   // Algunos frameworks reemplazan <html>/<body>: re-montar si nos quitan.
-  setInterval(() => { if (host && !host.isConnected) { host = null; mount(); } }, 1000);
+  setInterval(() => {
+    if (host && !host.isConnected) { host = null; mount(); }
+    // Si la página reemplaza sus hojas adoptadas, volver a poner la máscara
+    if (privSheet && privSheet.cssRules.length && !document.adoptedStyleSheets.includes(privSheet)) applyPrivacy();
+  }, 1000);
   requestAnimationFrame(drawTrail);
 
   // Traspaso al humano: banner clicable (el resto del overlay sigue sin capturar clics)
@@ -289,8 +310,8 @@ export const overlayScript = String.raw`
   }
 
   const api = Object.freeze({
-    move, ripple, say, highlight, ask, hud, teach, teachButton, toast,
-    state: () => ({ hud: !!lastHud, teach: lastTeach, teachButton: !!btnEl }),
+    move, ripple, say, highlight, ask, hud, teach, teachButton, toast, privacy,
+    state: () => ({ hud: !!lastHud, teach: lastTeach, teachButton: !!btnEl, privacy: privSheet ? privSheet.cssRules.length : 0 }),
     get: () => ({ ...pos }),
     trail: on => (enabled.trail = !!on),
     hide: () => host && (host.style.display = 'none'),

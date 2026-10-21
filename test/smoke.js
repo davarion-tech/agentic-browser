@@ -130,6 +130,18 @@ const st = JSON.parse(await call('browser_stats'));
 console.log('stats:', st);
 assert.ok(st.ratio > 1 && st.perceptions > 5 && st.tokensPerScreenshot === 1365, JSON.stringify(st));
 
+// Máscara de privacidad: los preajustes solo actúan en su dominio; los selectores, en cualquiera
+console.log(await call('browser_cursor_style', { privacy: 'whatsapp' }));
+assert.equal(await call('browser_eval', { expression: 'window.__agentCursor.state().privacy' }), '0');
+console.log(await call('browser_cursor_style', { privacy: ['whatsapp', 'table'] }));
+assert.equal(await call('browser_eval', { expression: 'window.__agentCursor.state().privacy' }), '1');
+assert.match(await call('browser_eval', { expression: 'getComputedStyle(document.querySelector("table")).filter' }), /blur\(10px\)/);
+assert.match(await call('browser_read', { selector: 'table' }), /Monitor/); // el agente sigue leyendo lo difuminado
+await call('browser_navigate', { url: pathToFileURL(path.join(here, 'page.html')).href }); // nace ya difuminado
+assert.equal(await call('browser_eval', { expression: 'window.__agentCursor.state().privacy' }), '1');
+assert.match(await call('browser_cursor_style', { privacy: 'off' }), /apagada/);
+assert.equal(await call('browser_eval', { expression: 'getComputedStyle(document.querySelector("table")).filter' }), '"none"');
+
 // Modo enseñar: el "humano" (aquí, las propias herramientas) hace la tarea y pulsa Terminar
 console.log(await call('browser_teach_start', { name: 'smoke-saludo' }));
 assert.equal(await call('browser_eval', { expression: 'window.__agentCursor.state().teach' }), '"smoke-saludo"');

@@ -125,6 +125,7 @@ Funciona con tu suscripción de Claude (`claude setup-token`) o con una API key.
 - **Botón "Enseñar" en el navegador.** Una pestaña pequeña en el borde izquierdo del Chrome del agente empieza a grabar sin pedírselo al agente. Pones nombre a la receta en el banner, pulsas Terminar y luego le dices a tu agente "repite <nombre>". Se oculta con `AGENT_TEACH_BUTTON=0`.
 - **Pantalla limpia.** La barra de traducir, la elección de buscador, el aviso de restaurar páginas y las preguntas de permisos de Chrome vienen apagados (los permisos se deniegan). Tras cada navegación se cierran los popups de las webs (idioma, newsletter, cookies, "Inicia sesión con Google") con clics visibles en su botón de cerrar o rechazar, nunca aceptar, suscribirse ni iniciar sesión. `browser_dismiss` lo hace cuando quieras; `AGENT_AUTO_DISMISS=0` apaga el cierre automático.
 - **Datos estructurados en una llamada.** `browser_extract` convierte la tabla o lista repetida más relevante (productos, resultados, contactos) en filas JSON o CSV con título, enlace, precio e imagen. Resuelve cabeceras combinadas, y el CSV se puede abrir en Excel sin riesgo.
+- **Máscara de privacidad** *(próxima versión, ya en `main`)*. `browser_cursor_style({ privacy: "whatsapp" })` o `AGENT_PRIVACY=whatsapp` difumina contactos, la cabecera del chat y las fotos de perfil para grabar o compartir la pantalla del agente sin exponer a nadie. Preajustes: `whatsapp`, `telegram`, `gmail`, o tus propios selectores CSS. El agente sigue leyéndolo todo.
 - **Contador de tokens en vivo.** `browser_cursor_style({ hud: true })` (o `AGENT_HUD=1`) muestra en la esquina de la página los tokens usados frente a lo que habrían costado las capturas. `browser_stats` devuelve las mismas cifras. Fórmula: tokens ≈ caracteres / 4; una captura ≈ ancho × alto / 750 por cada percepción.
 
 ## Herramientas
@@ -171,6 +172,7 @@ Funciona con tu suscripción de Claude (`claude setup-token`) o con una API key.
 | `AGENT_AUTO_DISMISS` | `1` | `0` deja de cerrar los popups de las webs tras cada navegación |
 | `AGENT_TEACH_BUTTON` | `1` | `0` oculta el botón flotante "Enseñar" |
 | `AGENT_HUD` | `0` | `1` muestra el contador de tokens desde el inicio |
+| `AGENT_PRIVACY` | — | Máscara de privacidad desde el inicio: `whatsapp`, `telegram`, `gmail` y/o selectores CSS, separados por comas |
 | `AGENT_RECIPES` | `~/.agentic-browser/recipes` | Carpeta de las recetas enseñadas (JSON) |
 | `AGENT_EXPORTS` | `~/.agentic-browser/exports` | Carpeta donde `browser_extract` guarda archivos |
 | `AGENT_READONLY` | `0` | `1` desactiva toda herramienta que modifique la página |
