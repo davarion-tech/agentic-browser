@@ -62,6 +62,8 @@ export function createTools(ab) {
 
   async function settle(page, before) {
     await sleep(ab.speed.settle);
+    // Una pestaña nueva que aún se está clasificando: esperar su evento para informarlo ya
+    for (let i = 0; i < 20 && ab.pagesPending > 0; i++) await sleep(50);
     if (page.url() !== before) await page.waitForLoadState('domcontentloaded', { timeout: 8000 }).catch(() => {});
   }
 

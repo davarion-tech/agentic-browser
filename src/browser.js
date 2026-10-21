@@ -156,6 +156,11 @@ export class AgentBrowser {
   async _onPage(p) {
     this._wire(p);
     if (this.ownPending > 0) return; // la gestiona newTab()
+    this.pagesPending = (this.pagesPending || 0) + 1;
+    try { await this._classify(p); } finally { this.pagesPending--; }
+  }
+
+  async _classify(p) {
     const t = Date.now(), active = this.page;
     const opener = await p.opener().catch(() => null);
     if (opener) this.openers.set(p, opener);

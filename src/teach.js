@@ -41,12 +41,25 @@ export class Teacher {
       if (Date.now() - s.lastAt > 3000) s.events.push({ action: 'goto', url: u });
       s.lastUrl = u;
     };
-    s.onLoad = () => this.bar(page, name);
+    s.onLoad = () => this.bar(page, s.label);
     page.on('framenavigated', s.onNav);
     page.on('load', s.onLoad);
+    s.pages = new Set([page]); // pestañas donde se muestra el banner (la persona puede cambiar de pestaña)
+    s.onPage = p => p.waitForLoadState('domcontentloaded').catch(() => {}).then(() => this.follow(p));
+    this.ab.context.on('page', s.onPage);
     this.session = s;
+    console.error(`[agentic-browser] grabando receta "${s.label}"${user ? ' (botón Enseñar)' : ''} en ${s.startUrl}`);
     await this.bar(page, name);
     return s;
+  }
+
+  // La persona siguió la tarea en otra pestaña (p. ej. un enlace que abre una nueva): el banner va con ella
+  follow(page) {
+    const s = this.session;
+    if (!s || !page || s.pages.has(page)) return;
+    s.pages.add(page);
+    page.on('load', () => { if (this.session === s) this.bar(page, s.label); });
+    this.bar(page, s.label);
   }
 
   onEvent(page, e) {
@@ -68,6 +81,7 @@ export class Teacher {
     }
     s.lastAt = Date.now();
     s.events.push(e);
+    this.follow(page);
   }
 
   // Grabación empezada con el botón: nadie llama a browser_teach_stop, así que se cierra aquí
@@ -75,9 +89,10 @@ export class Teacher {
     const s = this.session;
     const r = await this.stop({ how: ctrl }).catch(e => ({ error: e.message }));
     const msg = r.recipe ? `✓ Receta “${r.recipe.label}” guardada (${r.recipe.steps.length} pasos). Pídele a tu agente: “repite ${r.recipe.label}”.`
-      : r.cancelled ? 'Grabación cancelada: no se guardó nada.' : 'No se grabó ningún paso.';
-    await s.page.evaluate(t => window.__agentCursor?.toast(t), msg).catch(() => {});
+      : r.cancelled ? 'Grabación cancelada: no se guardó nada.' : r.error ? `No se pudo guardar: ${r.error}` : 'No se grabó ningún paso: haz clics o escribe en la página antes de pulsar Terminar.';
+    for (const p of s.pages) if (!p.isClosed()) await p.evaluate(t => window.__agentCursor?.toast(t), msg).catch(() => {});
     if (r.recipe) this.ab.events.push({ type: 'recipe-saved', name: r.recipe.name, steps: r.recipe.steps.length, params: Object.keys(r.recipe.params), note: 'la persona grabó esta receta con el botón Enseñar; repítela con browser_replay' });
+    else this.ab.events.push({ type: r.cancelled ? 'recipe-cancelled' : 'recipe-empty', name: s.name, error: r.error });
   }
 
   async bar(page, text) {
@@ -92,8 +107,10 @@ export class Teacher {
     if (!forced && wait) how = await Promise.race([s.done, sleep(timeout).then(() => 'timeout')]);
     s.page.off('framenavigated', s.onNav);
     s.page.off('load', s.onLoad);
+    this.ab.context?.off('page', s.onPage);
     this.session = null;
-    await this.bar(s.page, null);
+    for (const p of s.pages) if (!p.isClosed()) await this.bar(p, null);
+    console.error(`[agentic-browser] receta "${s.label}": ${how}, ${s.events.length} eventos`);
     if (how === 'cancel') return { cancelled: true };
     const recipe = this.build(s);
     if (!recipe.steps.length) return { empty: true, how };
