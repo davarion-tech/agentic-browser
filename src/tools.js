@@ -12,6 +12,11 @@ import { Teacher } from './teach.js';
 const TRACE = process.env.AGENT_TRACE || path.join(os.homedir(), '.agentic-browser', 'trace.jsonl');
 const EXPORTS = process.env.AGENT_EXPORTS || path.join(os.homedir(), '.agentic-browser', 'exports');
 const READONLY = process.env.AGENT_READONLY === '1';
+// browser_eval puede leer cookies y enviar datos fuera: apagado salvo que se active a propósito
+const ALLOW_EVAL = process.env.AGENT_ALLOW_EVAL === '1';
+// Teclas que no escriben nada: se permiten aunque el foco esté en un campo sensible
+const SAFE_KEY = /^(Shift\+)?Tab$|^(Escape|Enter|Backspace|Delete|Home|End|PageUp|PageDown|Arrow(Up|Down|Left|Right))$/;
+const SECRET_EVAL = /pass(word|wd)|one-time-code|cc-number|cc-csc|\botp\b/i;
 // Acciones de entrada: solo los popups que abran ellas pasan a ser la pestaña activa
 const INPUT = new Set(['browser_click', 'browser_type', 'browser_press', 'browser_drag', 'browser_select', 'browser_upload', 'browser_replay']);
 const MUTATING = new Set(['browser_click', 'browser_type', 'browser_press', 'browser_drag', 'browser_select', 'browser_upload', 'browser_eval', 'browser_replay']);
@@ -39,6 +44,34 @@ const y = z.number().optional().describe('Coordenada Y en píxeles CSS del viewp
 const snap = z.boolean().optional().describe('Si true, devuelve el snapshot tras la acción (ahorra un turno)');
 const isMac = process.platform === 'darwin';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// Texto que viene de la web: datos de terceros, nunca instrucciones. Se neutraliza el
+// delimitador dentro del contenido para que una página no pueda "salirse" de él.
+export function untrusted(url, text) {
+  const safe = String(text).replace(/<(\/?\s*page_content)/gi, '&lt;$1');
+  return `<page_content url="${String(url || '').replace(/"/g, '%22')}" trust="untrusted">\n${safe}\n</page_content>`;
+}
+
+// Carpetas desde las que se pueden subir archivos (AGENT_UPLOAD_DIRS, separadas por ";" en
+// Windows o ":" en macOS/Linux). Por defecto, solo la carpeta de descargas del agente.
+export function uploadDirs(ab) {
+  const raw = process.env.AGENT_UPLOAD_DIRS;
+  const list = raw ? raw.split(path.delimiter).map(d => d.trim()).filter(Boolean) : [ab.opts.downloadsDir];
+  return list.map(d => { try { return fs.realpathSync(path.resolve(d)); } catch { return path.resolve(d); } });
+}
+
+export function checkUpload(ab, files) {
+  const dirs = uploadDirs(ab);
+  const norm = p => (process.platform === 'win32' ? p.toLowerCase() : p);
+  return files.map(f => {
+    let real;
+    try { real = fs.realpathSync(path.resolve(f)); } catch { throw new Error(`no existe el archivo: ${f}`); }
+    if (!fs.statSync(real).isFile()) throw new Error(`no es un archivo: ${f}`);
+    const inside = dirs.some(d => { const rel = path.relative(norm(d), norm(real)); return rel && !rel.startsWith('..') && !path.isAbsolute(rel); });
+    if (!inside) throw new Error(`${f} está fuera de las carpetas permitidas para subir (AGENT_UPLOAD_DIRS): ${dirs.join(' ; ')}`);
+    return real;
+  });
+}
 
 function brief(d) {
   if (!d) return 'nada';
@@ -78,14 +111,15 @@ export function createTools(ab) {
       } else lines.push(`→ navegó a ${page.url()}`);
     }
     const ev = ab.drainEvents();
-    if (ev.length) lines.push('eventos: ' + JSON.stringify(ev));
-    if (wantSnap) { const [, s] = await ab.snapshotWithPrev(); lines.push('', formatSnapshot(s)); }
+    if (ev.length) lines.push('eventos: ' + untrusted(page.url(), JSON.stringify(ev)));
+    if (wantSnap) { const [, s] = await ab.snapshotWithPrev(); lines.push('', untrusted(s?.url, formatSnapshot(s))); }
     return lines.join('\n');
   }
 
   async function pointerAt(t, verb) {
     const r = await ab.resolve(t);
     const target = await ab.elementAt(r.x, r.y).catch(() => null);
+    if (target?.role === 'agent-cursor-host') throw new Error('en ese punto está el aviso para la persona (browser_request_human): solo ella puede pulsarlo');
     if (target && r.rect) {
       const notes = [];
       if (r.rect.relocated) notes.push('ref re-localizado tras un re-render');
@@ -143,7 +177,7 @@ export function createTools(ab) {
         if (AUTO_DISMISS) {
           await sleep(ab.speed.settle * 5);
           const c = await dismissPopups(page);
-          if (c.length) msg += `\n🧹 cerré popups: ${c.join('; ')}`;
+          if (c.length) msg += '\n🧹 ' + untrusted(page.url(), `cerré popups: ${c.join('; ')}`);
           // Segunda oportunidad para los que tardan en salir (cookies): en la próxima percepción
           dismissArm = { page, url: page.url(), until: Date.now() + 10000 };
         }
@@ -172,7 +206,7 @@ export function createTools(ab) {
       },
       async run({ diff, ...a }) {
         const [prev, s] = await ab.snapshotWithPrev(a);
-        return diff && prev ? diffSnapshot(prev, s) : formatSnapshot(s);
+        return untrusted(s?.url, diff && prev ? diffSnapshot(prev, s) : formatSnapshot(s));
       },
     },
     {
@@ -182,14 +216,14 @@ export function createTools(ab) {
       async run({ query, max = 15 }) {
         const r = await ab.find(query, max);
         if (!r.length) return `sin coincidencias para "${query}"`;
-        return r.map(d => `${brief(d)} @${d.x},${d.y}${d.inViewport ? '' : ' (fuera de pantalla)'}`).join('\n');
+        return untrusted((await ab.active()).url(), r.map(d => `${brief(d)} @${d.x},${d.y}${d.inViewport ? '' : ' (fuera de pantalla)'}`).join('\n'));
       },
     },
     {
       name: 'browser_element_at',
       description: 'Visión por píxel SIN imagen: dado (x,y) devuelve qué elemento hay ahí (rol, texto, si es clicable, ruta DOM).',
       schema: { x: z.number(), y: z.number() },
-      async run({ x, y }) { return JSON.stringify(await ab.elementAt(x, y)); },
+      async run({ x, y }) { return untrusted((await ab.active()).url(), JSON.stringify(await ab.elementAt(x, y))); },
     },
     {
       name: 'browser_cursor',
@@ -199,7 +233,7 @@ export function createTools(ab) {
         const page = await ab.active();
         const c = ab.cursor.get(page);
         if (!c) return 'cursor aún no se ha movido';
-        return JSON.stringify({ x: c.x, y: c.y, under: await ab.elementAt(c.x, c.y) });
+        return untrusted(page.url(), JSON.stringify({ x: c.x, y: c.y, under: await ab.elementAt(c.x, c.y) }));
       },
     },
     {
@@ -229,7 +263,7 @@ export function createTools(ab) {
     },
     {
       name: 'browser_type',
-      description: 'Escribe texto con eventos de teclado reales. Si das ref/x,y primero hace clic para enfocar.',
+      description: 'Escribe texto con eventos de teclado reales. Si das ref/x,y primero hace clic para enfocar. Nunca escribe en contraseñas, códigos 2FA, tarjetas ni números de cuenta (estado {sensitive}): eso lo hace la persona con browser_request_human.',
       schema: {
         text: z.string(), ref, x, y,
         clear: z.boolean().optional().describe('Borra el contenido antes de escribir'),
@@ -239,6 +273,7 @@ export function createTools(ab) {
       },
       async run({ text, clear, submit, delay, snapshot, ...t }) {
         const page = await ab.active(); const u = page.url();
+        if (text.includes('\t')) throw new Error('el texto no puede llevar tabuladores (moverían el foco a otro campo); usa browser_press "Tab"');
         let where = 'elemento enfocado';
         if (t.ref !== undefined || (t.x !== undefined && t.y !== undefined)) {
           const r = await pointerAt(t, 'escribir en');
@@ -247,6 +282,8 @@ export function createTools(ab) {
           await page.mouse.click(r.x, r.y, { delay: 30 });
           where = brief(r.target);
         }
+        const secret = await ab.focusSensitive(page);
+        if (secret) throw new Error(`el foco está en un campo sensible (${secret}): el agente nunca escribe contraseñas, códigos ni datos bancarios. Usa browser_request_human para que lo haga la persona.`);
         if (clear) { await page.keyboard.press(isMac ? 'Meta+A' : 'Control+A'); await page.keyboard.press('Backspace'); }
         ab.markAction();
         // Quien mira debe ver lo que se escribe: el campo enfocado entra en pantalla antes y después
@@ -265,7 +302,12 @@ export function createTools(ab) {
       schema: { keys: z.string(), snapshot: snap },
       async run({ keys, snapshot }) {
         const page = await ab.active(); const u = page.url();
-        for (const k of keys.split(/\s+/).filter(Boolean)) { ab.markAction(); await page.keyboard.press(k); }
+        const list = keys.split(/\s+/).filter(Boolean);
+        if (list.some(k => !SAFE_KEY.test(k))) {
+          const secret = await ab.focusSensitive(page);
+          if (secret) throw new Error(`el foco está en un campo sensible (${secret}): no se pulsan teclas que escriban o peguen. Usa browser_request_human.`);
+        }
+        for (const k of list) { ab.markAction(); await page.keyboard.press(k); }
         return after(page, u, `ok ${keys}`, snapshot);
       },
     },
@@ -319,13 +361,18 @@ export function createTools(ab) {
     },
     {
       name: 'browser_upload',
-      description: 'Adjunta archivos locales a un <input type=file> (o al selector que abre un clic en ese ref).',
+      description: 'Adjunta archivos locales a un <input type=file> (o al selector que abre un clic en ese ref). Solo desde las carpetas permitidas (AGENT_UPLOAD_DIRS).',
       schema: { ref: z.union([z.string(), z.number()]), files: z.array(z.string()) },
       async run({ ref: r, files }) {
+        files = checkUpload(ab, files);
         const page = await ab.active();
-        const chooser = page.waitForEvent('filechooser', { timeout: 5000 });
+        // El error del selector se captura ya: si el clic tarda más que la espera (Drive), una
+        // promesa rechazada sin manejador tumbaría todo el proceso del MCP.
+        const chooser = page.waitForEvent('filechooser', { timeout: 15000 }).then(c => c, e => e);
         await tools.find(t => t.name === 'browser_click').run({ ref: r });
-        await (await chooser).setFiles(files);
+        const fc = await chooser;
+        if (fc instanceof Error) throw new Error(`el clic en ${r} no abrió el selector de archivos (${fc.message.split('\n')[0]})`);
+        await fc.setFiles(files);
         return `ok ${files.length} archivo(s) adjuntados`;
       },
     },
@@ -337,7 +384,7 @@ export function createTools(ab) {
         const page = await ab.active();
         const t = await page.evaluate(s => (s ? document.querySelector(s) : document.body)?.innerText || '', selector);
         // Delimitado: el texto de la web son datos de terceros, no instrucciones
-        return `<page_content url="${page.url()}" trust="untrusted">\n${t.replace(/\n{3,}/g, '\n\n').slice(0, maxChars)}\n</page_content>`;
+        return untrusted(page.url(), t.replace(/\n{3,}/g, '\n\n').slice(0, maxChars));
       },
     },
     {
@@ -368,20 +415,22 @@ export function createTools(ab) {
           const out = path.resolve(EXPORTS, file);
           fs.mkdirSync(path.dirname(out), { recursive: true });
           fs.writeFileSync(out, body);
-          return `${head}\nguardado en ${out}`;
+          return untrusted(page.url(), `${head}\nguardado en ${out}`);
         }
         // Delimitado: el contenido de la web son datos de terceros, no instrucciones
-        return `${head}\n<page_data url="${page.url()}" trust="untrusted">\n${body}\n</page_data>`;
+        return untrusted(page.url(), `${head}\n${body}`);
       },
     },
     {
       name: 'browser_eval',
-      description: 'Ejecuta JavaScript en la página y devuelve el resultado (JSON).',
+      description: 'Ejecuta JavaScript en la página y devuelve el resultado (JSON). Desactivada salvo AGENT_ALLOW_EVAL=1.',
       schema: { expression: z.string() },
       async run({ expression }) {
+        if (!ALLOW_EVAL) throw new Error('browser_eval está desactivada (puede leer cookies y sacar datos de la página). Actívala solo si hace falta con AGENT_ALLOW_EVAL=1.');
+        if (SECRET_EVAL.test(expression)) throw new Error('browser_eval no puede tocar contraseñas, códigos ni tarjetas; usa browser_request_human');
         const page = await ab.active();
         const v = await page.evaluate(e => (0, eval)(e), expression);
-        return JSON.stringify(v ?? null).slice(0, 20000);
+        return untrusted(page.url(), JSON.stringify(v ?? null).slice(0, 20000));
       },
     },
     {
@@ -405,7 +454,7 @@ export function createTools(ab) {
         titleChange: z.boolean().optional().describe('Despertar si cambia el título (true)'),
         timeout: z.number().optional().describe('ms máximos de espera (300000)'),
       },
-      async run(a) { return JSON.stringify(await ab.watch(await ab.active(), a)); },
+      async run(a) { const page = await ab.active(); return untrusted(page.url(), JSON.stringify(await ab.watch(page, a))); },
     },
     {
       name: 'browser_request_human',
@@ -446,14 +495,15 @@ export function createTools(ab) {
       schema: { limit: z.number().optional() },
       async run({ limit = 30 }) {
         const page = await ab.active();
-        return (ab.consoleLog.get(page) || []).slice(-limit).map(m => `[${m.type}] ${m.text}`).join('\n') || '(vacío)';
+        const t = (ab.consoleLog.get(page) || []).slice(-limit).map(m => `[${m.type}] ${m.text}`).join('\n');
+        return t ? untrusted(page.url(), t) : '(vacío)';
       },
     },
     {
       name: 'browser_events',
       description: 'Diálogos aceptados, descargas guardadas y popups abiertos desde la última consulta.',
       schema: {},
-      async run() { return JSON.stringify(ab.drainEvents()); },
+      async run() { const ev = ab.drainEvents(); return ev.length ? untrusted(ab.page?.url(), JSON.stringify(ev)) : '[]'; },
     },
     {
       name: 'browser_cursor_style',
@@ -478,7 +528,7 @@ export function createTools(ab) {
       async run() {
         const page = await ab.active();
         const c = await dismissPopups(page);
-        return c.length ? `cerré ${c.length} popup(s): ${c.join('; ')}` : 'no encontré popups que cerrar';
+        return c.length ? untrusted(page.url(), `cerré ${c.length} popup(s): ${c.join('; ')}`) : 'no encontré popups que cerrar';
       },
     },
     {
@@ -511,7 +561,7 @@ export function createTools(ab) {
         const r = await teacher.stop({ wait, timeout });
         if (r.cancelled) return 'la persona canceló: no se guardó nada';
         if (r.empty) return `no se grabó ningún paso${r.how === 'timeout' ? ' (se agotó el tiempo)' : ''}`;
-        return `${teacher.summary(r.recipe)}\nguardada en ${r.file}${r.how === 'timeout' ? ' (se agotó el tiempo; se guardó lo grabado)' : ''}\nRepítela con browser_replay {name: "${r.recipe.name}", params: {...}}`;
+        return untrusted(r.recipe.startUrl, teacher.summary(r.recipe)) + `\nguardada en ${r.file}${r.how === 'timeout' ? ' (se agotó el tiempo; se guardó lo grabado)' : ''}\nRepítela con browser_replay {name: "${r.recipe.name}", params: {...}}`;
       },
     },
     {
@@ -519,7 +569,7 @@ export function createTools(ab) {
       description: 'Lista las recetas grabadas o, con name, muestra sus pasos y parámetros.',
       schema: { name: z.string().optional() },
       async run({ name }) {
-        if (name) return teacher.summary(teacher.load(name));
+        if (name) { const r = teacher.load(name); return untrusted(r.startUrl, teacher.summary(r)); }
         const all = teacher.list();
         return all.length ? all.map(r => `${r.name} — ${r.steps.length} pasos, params: ${Object.keys(r.params).join(', ') || 'ninguno'} · ${r.startUrl}`).join('\n') : '(sin recetas; graba una con browser_teach_start)';
       },
@@ -564,7 +614,7 @@ export function createTools(ab) {
         page = await ab.active();
         if (unknown.length) log.push(`⚠ params desconocidos ignorados: ${unknown.join(', ')} (la receta usa: ${Object.keys(recipe.params).join(', ') || 'ninguno'})`);
         log.unshift(`receta "${recipe.name}": ${replaySteps}/${recipe.steps.length} pasos`);
-        return after(page, page.url(), log.join('\n') + `\n→ "${await page.title()}" ${page.url()}`, snapshot);
+        return after(page, page.url(), untrusted(page.url(), log.join('\n') + `\n→ "${await page.title()}" ${page.url()}`), snapshot);
       },
     },
     {
@@ -613,7 +663,8 @@ export function createTools(ab) {
         }
         lines.unshift(`batch: ${done}/${actions.length} acciones`);
         if (snapshot) { const [, s] = await ab.snapshotWithPrev(); lines.push('', formatSnapshot(s)); }
-        return lines.join('\n');
+        // Las respuestas internas traen texto de la web (y recortado): todo el lote va como no confiable
+        return untrusted(ab.page?.url(), lines.join('\n'));
       },
     },
     {
@@ -671,7 +722,7 @@ export function createTools(ab) {
           const a = dismissArm; dismissArm = null;
           if (a.page === ab.page && !a.page.isClosed() && a.page.url() === a.url && Date.now() < a.until) {
             const c = await dismissPopups(a.page);
-            if (c.length) pre = `🧹 cerré popups: ${c.join('; ')}\n`;
+            if (c.length) pre = '🧹 ' + untrusted(a.page.url(), `cerré popups: ${c.join('; ')}`) + '\n';
           }
         }
         out = await t.run(args);
@@ -687,7 +738,13 @@ export function createTools(ab) {
           ab.hud.stats = { ratio: s.ratio, used: s.tokensUsed, shots: s.screenshotEquivalent, calls: s.calls };
           await ab.showHud(ab.page);
         }
-        const rec = { at: new Date().toISOString(), tool: t.name, args: Object.fromEntries(Object.entries(args).map(([k, v]) => [k, shorten(v)])),
+        // Lo que se escribe no se guarda nunca en claro: solo su longitud
+        const logged = Object.fromEntries(Object.entries(args).map(([k, v]) =>
+          [k, t.name === 'browser_type' && k === 'text' ? `[${String(v).length} chars]`
+            // en un lote tampoco: los textos de browser_type van ocultos
+            : t.name === 'browser_batch' && k === 'actions' ? v.map(a => ({ tool: a.tool, args: a.args && 'text' in a.args ? { ...a.args, text: `[${String(a.args.text).length} chars]` } : a.args }))
+            : t.name === 'browser_replay' && k === 'params' ? Object.keys(v) : shorten(v)]));
+        const rec = { at: new Date().toISOString(), tool: t.name, args: logged,
           ms: Date.now() - t0, url: ab.page && !ab.page.isClosed() ? ab.page.url() : null, ok,
           result: typeof out === 'string' ? out.slice(0, 200) : out?.image ? '[imagen]' : null };
         try { fs.mkdirSync(path.dirname(TRACE), { recursive: true }); fs.appendFileSync(TRACE, JSON.stringify(rec) + '\n'); } catch {}

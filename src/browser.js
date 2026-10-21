@@ -4,6 +4,7 @@ import { chromium } from 'playwright-core';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { overlayScript } from './overlay.js';
 import { perceptionScript } from './perception.js';
 
@@ -42,7 +43,9 @@ export class AgentBrowser {
       downloadsDir: process.env.AGENT_DOWNLOADS || path.join(os.homedir(), '.agentic-browser', 'downloads'),
       // ms por cada 100 px de recorrido del cursor; 0 = teletransporte
       cursorSpeed: null,
-      dialogs: process.env.AGENT_DIALOGS || 'accept',
+      // Por defecto se CANCELAN (un confirm("¿Borrar?") nunca se acepta solo); el texto llega al agente en los eventos
+      dialogs: process.env.AGENT_DIALOGS || 'dismiss',
+      noSandbox: process.env.AGENT_NO_SANDBOX === '1',
       viewport: null,
       ...opts,
     };
@@ -54,6 +57,10 @@ export class AgentBrowser {
       this.opts.viewport = m ? { width: +m[1], height: +m[2] } : this.opts.headless ? { width: 1280, height: 800 } : null;
     }
     this.lastViewport = this.opts.viewport;
+    // Token del modo enseñar: va dentro de nuestros scripts; los mensajes sin él (de la página) se ignoran
+    this.teachToken = process.env.AGENT_TEACH_TOKEN || crypto.randomBytes(16).toString('hex'); // fijo solo en las pruebas
+    this.overlay = overlayScript.replaceAll('__AGENT_TOKEN__', this.teachToken);
+    this.perception = perceptionScript.replaceAll('__AGENT_TOKEN__', this.teachToken);
     this.speed = SPEEDS[process.env.AGENT_SPEED] || SPEEDS.normal;
     if (this.opts.cursorSpeed == null) this.opts.cursorSpeed = Number(process.env.AGENT_CURSOR_SPEED ?? this.speed.cursor);
     this.context = null;
@@ -107,6 +114,9 @@ export class AgentBrowser {
           viewport: this.opts.viewport,
           acceptDownloads: true,
           downloadsPath: this.opts.downloadsDir,
+          // Sandbox de Chrome ACTIVADO (playwright-core lo quita por defecto con --no-sandbox):
+          // aísla cada pestaña del sistema. Solo para Linux como root/Docker: AGENT_NO_SANDBOX=1
+          chromiumSandbox: !this.opts.noSandbox,
           // Pantalla limpia para quien mira: sin barra de traducir, sin elegir buscador, sin
           // "restaurar páginas" y sin preguntas de permisos (se deniegan: más privado)
           args: ['--no-first-run', '--no-default-browser-check', '--disable-features=Translate,TranslateUI',
@@ -122,10 +132,10 @@ export class AgentBrowser {
       }
     }
     // Canal página -> servidor del modo enseñar (botón flotante y banner). Antes del overlay.
-    await this.context.exposeBinding('__agentTeachEmit', (src, e) => this.onTeach?.(src.page, e)).catch(() => {});
+    await this.context.exposeBinding('__agentTeachEmit', (src, e) => { if (e && e.token === this.teachToken) this.onTeach?.(src.page, e); }).catch(() => {});
     await this.context.addInitScript(on => { window.__agentTeachButton = on; }, process.env.AGENT_TEACH_BUTTON !== '0' && !this.opts.headless);
-    await this.context.addInitScript(overlayScript);
-    await this.context.addInitScript(perceptionScript);
+    await this.context.addInitScript(this.overlay);
+    await this.context.addInitScript(this.perception);
     this.context.on('page', p => this._onPage(p));
     this.context.on('close', () => { this.context = null; this.page = null; });
     for (const p of this.context.pages()) this._wire(p);
@@ -212,8 +222,8 @@ export class AgentBrowser {
   async ensure(frame) {
     const ok = await frame.evaluate(() => !!window.__agentPerc).catch(() => false);
     if (!ok) {
-      await frame.evaluate(perceptionScript).catch(() => {});
-      if (frame === frame.page().mainFrame()) await frame.evaluate(overlayScript).catch(() => {});
+      await frame.evaluate(this.perception).catch(() => {});
+      if (frame === frame.page().mainFrame()) await frame.evaluate(this.overlay).catch(() => {});
     }
   }
 
@@ -405,6 +415,17 @@ export class AgentBrowser {
       if (r.reason !== 'timeout') return r;
     }
     return { reason: 'timeout' };
+  }
+
+  // Nombre del campo sensible enfocado (contraseña, código 2FA, tarjeta...) en cualquier frame, o null
+  async focusSensitive(page) {
+    for (const f of page.frames()) {
+      if (f.isDetached()) continue;
+      await this.ensure(f);
+      const hit = await f.evaluate(() => window.__agentPerc?.focusSensitive()).catch(() => null);
+      if (hit) return hit;
+    }
+    return null;
   }
 
   drainEvents() { const e = this.events; this.events = []; return e; }

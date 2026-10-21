@@ -129,7 +129,7 @@ viewport 1280x800 scroll=0,0 docH=2090
 [f1:1] button "Button inside iframe" @214,217
 ```
 
-## New in 1.1
+## New in 1.2
 
 - **Teach it once, replay forever.** `browser_teach_start` records a task while *you* do it in the agent's Chrome (clicks, text, selects, Enter). It is saved as a recipe of roles and names, not pixels, so it survives layout changes. `browser_replay` repeats it with new values (`{"search": "October invoices"}`) without perceiving every step. Passwords are never recorded: on replay, the person types them.
 - **An "Enseñar" (teach) button in the browser.** A small tab on the left edge of the agent's Chrome starts a recording without asking the agent. Name the recipe in the banner, press Finish, then tell your agent "repeat <name>". Disable it with `AGENT_TEACH_BUTTON=0`.
@@ -150,7 +150,7 @@ viewport 1280x800 scroll=0,0 docH=2090
 | `browser_scroll` / `browser_drag` | Mouse wheel; drag and drop |
 | `browser_select` / `browser_upload` | `<select>` options; file inputs |
 | `browser_navigate` / `browser_history` / `browser_tabs` | Navigation and tabs |
-| `browser_read` / `browser_eval` | Readable text (wrapped as untrusted content); arbitrary JS |
+| `browser_read` / `browser_eval` | Readable text (wrapped as untrusted content); arbitrary JS (only with `AGENT_ALLOW_EVAL=1`) |
 | `browser_extract` | Table or repeated list → JSON or CSV rows (title, url, price, image…). `file` saves it to disk |
 | `browser_teach_start` / `browser_teach_stop` | Record a task the person performs once, as a reusable recipe |
 | `browser_recipes` / `browser_replay` | List or show recipes; replay one with new `params` at almost zero tokens |
@@ -187,10 +187,13 @@ Most actions accept `snapshot: true` and return the new page state in the same r
 | `AGENT_EXPORTS` | `~/.agentic-browser/exports` | Where `browser_extract` writes files |
 | `AGENT_READONLY` | `0` | `1` disables every tool that changes a page |
 | `AGENT_ALLOWED_ORIGINS` | — | Domain allowlist, e.g. `wikipedia.org,localhost` (subdomains included) |
-| `AGENT_DIALOGS` | `accept` | `alert/confirm/prompt`: `accept` or `dismiss` |
+| `AGENT_DIALOGS` | `dismiss` | `alert/confirm/prompt`: `dismiss` (default since 1.1.0: a `confirm("Delete?")` is never accepted on its own) or `accept`. The dialog text reaches the agent as an event |
 | `AGENT_TRACE` | `~/.agentic-browser/trace.jsonl` | Audit log of every tool call |
 | `AGENT_CHROME` | auto-detected | Path to the browser. Any Chromium browser works: Chrome, Edge (falls back to it automatically), Brave, Chromium |
-| `AGENT_HTTP_PORT` / `AGENT_TOKEN` | `8787` / — | HTTP port and optional Bearer token |
+| `AGENT_HTTP_PORT` / `AGENT_TOKEN` | `8787` / generated | HTTP port and **required** Bearer token. Without `AGENT_TOKEN`, one is generated in `~/.agentic-browser/http-token` (path configurable with `AGENT_TOKEN_FILE`). Requests coming from web pages are rejected |
+| `AGENT_NO_SANDBOX` | `0` | `1` launches Chrome without its sandbox. Only for Linux as root or containers where the sandbox cannot start; it lowers isolation |
+| `AGENT_ALLOW_EVAL` | `0` | `1` enables `browser_eval` (off by default: it can read cookies and exfiltrate data) |
+| `AGENT_UPLOAD_DIRS` | downloads folder | Folders `browser_upload` may upload from, separated by `;` on Windows and `:` on macOS/Linux |
 | `AGENT_RECORDINGS` | `~/.agentic-browser/recordings` | Where `browser_record_stop` saves videos |
 | `AGENT_FFMPEG` | `ffmpeg` | Path to ffmpeg for MP4 recordings; `none` forces the WebM fallback |
 
@@ -207,7 +210,7 @@ Most actions accept `snapshot: true` and return the new page state in the same r
 Based on the most common complaints about browser agents (stale refs, token bloat, popups, multi-agent conflicts, prompt injection, observability):
 
 - [x] Reference **chat watcher** for agent-owned accounts: wakes on new messages at zero tokens and replies under a code-enforced policy (draft by default, allowlist, sensitive keywords, rate limit, domain lock). See [docs/WATCHER.md](docs/WATCHER.md).
-- [x] Teach mode and recipe replay, structured extraction and a live token counter (1.1).
+- [x] Teach mode and recipe replay, structured extraction, a live token counter, popup dismissal and `browser_batch` (1.2).
 - [ ] Multi-agent sessions on one profile, with tab ownership and leases.
 - [ ] `browser_batch`: several actions in one call.
 - [ ] Hidden-text detection (instructions hidden with CSS) as a prompt-injection signal.

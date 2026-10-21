@@ -6,6 +6,9 @@ export const overlayScript = String.raw`
 (() => {
   if (window.top !== window) return;            // solo en el frame principal
   if (window.__agentCursor) return;
+  const TOKEN = '__AGENT_TOKEN__';
+  const SEND = typeof window.__agentTeachEmit === 'function' ? window.__agentTeachEmit : null;
+  const send = e => { try { if (SEND) SEND({ ...e, token: TOKEN }); } catch {} };
   const COLOR = '#ff3b6b';
   let host, root, cursor, label, trailCanvas, ctx;
   let pos = { x: -100, y: -100 };
@@ -133,7 +136,7 @@ export const overlayScript = String.raw`
     msg.append(name);
     const mk = (label, bg, ctrl) => { const b = document.createElement('button'); b.textContent = label;
       b.style.cssText = 'all:unset;cursor:pointer;padding:7px 12px;border-radius:8px;font-weight:600;background:' + bg;
-      b.onclick = () => { try { window.__agentTeachEmit && window.__agentTeachEmit({ ctrl, name: name.value.trim() }); } catch {} }; return b; };
+      b.onclick = e => { if (e.isTrusted) send({ ctrl, name: name.value.trim() }); }; return b; };
     bar.append(msg, mk('Terminar', COLOR, 'done'), mk('Cancelar', '#374151', 'cancel'));
     root.appendChild(bar);
     teachEl = bar;
@@ -158,7 +161,7 @@ export const overlayScript = String.raw`
     b.append(dot, 'Enseñar una tarea');
     b.onmouseenter = () => { b.style.maxWidth = '200px'; b.style.background = 'rgba(17,24,39,.95)'; };
     b.onmouseleave = () => { b.style.maxWidth = '34px'; b.style.background = 'rgba(17,24,39,.78)'; };
-    b.onclick = () => { try { window.__agentTeachEmit && window.__agentTeachEmit({ ctrl: 'start' }); } catch {} };
+    b.onclick = e => { if (e.isTrusted) send({ ctrl: 'start' }); };
     root.appendChild(b);
     btnEl = b;
   }
@@ -278,19 +281,22 @@ export const overlayScript = String.raw`
     root.appendChild(bar);
     let resolve; const promise = new Promise(r => (resolve = r));
     const done = v => { bar.remove(); pendingAsk = null; resolve(v); };
-    ok.onclick = () => done('done'); no.onclick = () => done('cancel');
+    // Solo clics reales de una persona; la página no puede resolverlo con dispatchEvent
+    ok.onclick = e => { if (e.isTrusted) done('done'); };
+    no.onclick = e => { if (e.isTrusted) done('cancel'); };
     pendingAsk = { promise };
     return promise;
   }
 
-  window.__agentCursor = {
+  const api = Object.freeze({
     move, ripple, say, highlight, ask, hud, teach, teachButton, toast,
     state: () => ({ hud: !!lastHud, teach: lastTeach, teachButton: !!btnEl }),
     get: () => ({ ...pos }),
     trail: on => (enabled.trail = !!on),
     hide: () => host && (host.style.display = 'none'),
     show: () => host && (host.style.display = ''),
-  };
-  Object.defineProperty(window, '__agentCursor', { enumerable: false });
+  });
+  // Bloqueado: la página no puede sustituirlo (p. ej. un ask() falso que responda "done")
+  Object.defineProperty(window, '__agentCursor', { value: api, enumerable: false, writable: false, configurable: false });
 })();
 `;

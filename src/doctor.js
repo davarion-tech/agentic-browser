@@ -19,7 +19,7 @@ if (!exe) bad('Chrome no encontrado. Instálalo o define AGENT_CHROME con la rut
 else {
   ok(`Chrome: ${exe}`);
   try {
-    const b = await chromium.launch({ executablePath: exe, headless: true });
+    const b = await chromium.launch({ executablePath: exe, headless: true, chromiumSandbox: process.env.AGENT_NO_SANDBOX !== '1' });
     ok(`Arranca en headless, versión ${b.version()}`);
     await b.close();
   } catch (e) { bad('No arranca: ' + e.message.split('\n')[0]); }

@@ -6,6 +6,8 @@
 export const perceptionScript = String.raw`
 (() => {
   if (window.__agentPerc) return;
+  const TOKEN = '__AGENT_TOKEN__';
+  const SEND = typeof window.__agentTeachEmit === 'function' ? window.__agentTeachEmit : null;
   const refs = new Map();          // id -> Element
   const ids = new WeakMap();       // Element -> id
   const meta = new Map();          // id -> {role,name}: para re-localizar refs obsoletos
@@ -98,12 +100,14 @@ export const perceptionScript = String.raw`
       w: Math.round(r.width), h: Math.round(r.height) };
     meta.set(d.ref, { role: d.role, name: d.name });
     if ('value' in el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) && !/^(password|checkbox|radio)$/.test(el.type)) d.value = clean(String(el.value), 60);
-    if (el.tagName === 'INPUT' && el.type === 'password') d.value = el.value ? '••••' : '';
+    const secret = sensitive(el);
+    if (secret) d.value = el.value ? '••••' : '';
     if (el.placeholder) d.placeholder = clean(el.placeholder, 40);
     if (el.tagName === 'A' && el.href) d.href = clean(el.getAttribute('href'), 80);
     if (el.tagName === 'SELECT') d.options = [...el.options].slice(0, 15).map(o => (o.selected ? '*' : '') + clean(o.text, 30));
     const st = state(el);
     if (occluded(el, r)) st.push('occluded');
+    if (secret) st.push('sensitive');
     if (st.length) d.state = st;
     return d;
   }
@@ -204,7 +208,6 @@ export const perceptionScript = String.raw`
   // ---- Modo enseñar: descripción estable de un elemento (rol + nombre, no píxeles) ----
   const isField = el => !!el && el.nodeType === 1 && ((/^(INPUT|TEXTAREA)$/.test(el.tagName) &&
     !/^(checkbox|radio|button|submit|reset|file|image|range|color)$/i.test(el.type)) || el.isContentEditable);
-  const isSecret = el => el.type === 'password' || /cc-|one-time-code|password/i.test(el.autocomplete || '');
   // El nombre de un campo no puede depender de lo que hay escrito dentro
   function stableName(el) {
     if (!isField(el)) return clean(name(el), 80);
@@ -221,11 +224,12 @@ export const perceptionScript = String.raw`
     return t;
   }
 
-  // Solo emite si el servidor está grabando una receta (expone __agentTeachEmit)
-  const emit = e => { try { if (typeof window.__agentTeachEmit === 'function') window.__agentTeachEmit(e); } catch {} };
+  // Canal al servidor, capturado antes que los scripts de la página (no puede sustituirlo ni espiarlo)
+  // y firmado con un token que solo conocen nuestros scripts: la página no puede inventar pasos.
+  const emit = e => { try { if (SEND) SEND({ ...e, token: TOKEN }); } catch {} };
   const origin = e => { const p = e.composedPath()[0]; return p instanceof Element ? p : e.target; };
   function emitType(el) {
-    const secret = isSecret(el);
+    const secret = sensitive(el); // misma regla que bloquea escribir: el valor nunca se graba
     emit({ action: 'type', target: recipeTarget(el), value: secret ? null : (el.isContentEditable ? el.innerText : el.value), secret, url: location.href });
   }
   addEventListener('click', e => {
@@ -237,21 +241,45 @@ export const perceptionScript = String.raw`
     emit({ action: 'click', target: recipeTarget(t), url: location.href });
   }, true);
   addEventListener('change', e => {
+    if (!e.isTrusted) return; // solo lo que hace una persona (o el ratón y teclado reales)
     const el = origin(e);
     if (!(el instanceof Element)) return;
     if (el.tagName === 'SELECT') emit({ action: 'select', target: recipeTarget(el), value: [...el.selectedOptions].map(o => o.text.trim()), url: location.href });
     else if (isField(el)) emitType(el);
   }, true);
   // input: el paso queda en el orden real (change llega al perder el foco); el servidor junta las pulsaciones
-  addEventListener('input', e => { const el = origin(e); if (el instanceof Element && isField(el)) emitType(el); }, true);
-  addEventListener('focusout', e => { const el = origin(e); if (el instanceof Element && el.isContentEditable) emitType(el); }, true);
+  addEventListener('input', e => { if (!e.isTrusted) return; const el = origin(e); if (el instanceof Element && isField(el)) emitType(el); }, true);
+  addEventListener('focusout', e => { if (!e.isTrusted) return; const el = origin(e); if (el instanceof Element && el.isContentEditable) emitType(el); }, true);
   addEventListener('keydown', e => {
     if (!e.isTrusted || e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
     const el = origin(e);
     if (isField(el) && el.tagName !== 'TEXTAREA' && !el.isContentEditable) { emitType(el); emit({ action: 'press', key: 'Enter', url: location.href }); }
   }, true);
 
-  window.__agentPerc = {
+  // Campos donde el agente NUNCA escribe: contraseñas, códigos 2FA, tarjetas, cuentas.
+  // Los rellena la persona (browser_request_human).
+  const SENSITIVE_AC = /\b(current-password|new-password|one-time-code|cc-number|cc-csc|cc-exp(-month|-year)?)\b/i;
+  const SENSITIVE_NAME = /pass(word|wd|code|phrase)|\bpwd\b|contrase|\botp\b|one.?time|2fa|mfa|verification.?code|c[oó]digo de (verificaci|seguridad|acceso)|\bcvv\b|\bcvc\b|security.?code|\bssn\b|social.?security|routing.?(number|no)|account.?(number|no\b)|card.?number|n[uú]mero de (tarjeta|cuenta)|\bpin\b/i;
+  function sensitive(el) {
+    if (!el || el.nodeType !== 1) return false;
+    if (el.tagName === 'INPUT' && (el.type || '').toLowerCase() === 'password') return true;
+    if (SENSITIVE_AC.test(el.getAttribute('autocomplete') || '')) return true;
+    if (!/^(INPUT|TEXTAREA)$/.test(el.tagName) && !el.isContentEditable) return false;
+    const hint = ['name', 'id', 'aria-label', 'placeholder', 'title'].map(a => el.getAttribute(a) || '').join(' ') +
+      ' ' + (el.labels && el.labels[0] ? el.labels[0].innerText : '');
+    return SENSITIVE_NAME.test(hint);
+  }
+  // Elemento enfocado atravesando shadow roots
+  function deepActive() {
+    let a = document.activeElement;
+    while (a && a.shadowRoot && a.shadowRoot.activeElement) a = a.shadowRoot.activeElement;
+    return a;
+  }
+
+  const api = {
+    // ¿El foco está en un campo sensible? Los iframes se comprueban por separado desde Node.
+    focusSensitive() { const a = deepActive(); return a && a.tagName !== 'IFRAME' && sensitive(a) ? (a.getAttribute('name') || a.id || a.type || a.tagName.toLowerCase()) : null; },
+
     snapshot({ ox = 0, oy = 0, viewportOnly = true, includeText = false, max = 250 } = {}) {
       const sel = INTERACTIVE + ',' + LANDMARK;
       const items = [];
@@ -440,7 +468,7 @@ export const perceptionScript = String.raw`
     rect(ref, ox = 0, oy = 0) {
       let el = refs.get(ref);
       let relocated = false;
-      if (!el || !el.isConnected) { el = this.relocate(ref); relocated = !!el; }
+      if (!el || !el.isConnected) { el = api.relocate(ref); relocated = !!el; }
       if (!el) return null;
       el.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
       const r = el.getBoundingClientRect();
@@ -449,7 +477,9 @@ export const perceptionScript = String.raw`
         occluded: occluded(el, r) };
     },
   };
-  Object.defineProperty(window, '__agentPerc', { enumerable: false });
+  // Bloqueado: la página no puede sustituirlo por uno falso (corre antes que sus scripts)
+  Object.freeze(api);
+  Object.defineProperty(window, '__agentPerc', { value: api, enumerable: false, writable: false, configurable: false });
 })();
 `;
 

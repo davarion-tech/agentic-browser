@@ -119,7 +119,7 @@ npm run watcher
 
 Funciona con tu suscripción de Claude (`claude setup-token`) o con una API key. Lee antes [docs/WATCHER.md](docs/WATCHER.md) y el [Aviso de responsabilidad](DISCLAIMER.md): muchas plataformas prohíben los bots no oficiales.
 
-## Novedades de la 1.1
+## Novedades de la 1.2
 
 - **Enséñalo una vez y se repite siempre.** `browser_teach_start` graba una tarea mientras *tú* la haces en el Chrome del agente (clics, textos, selecciones, Enter). Se guarda como receta de roles y nombres, no de píxeles, así que aguanta cambios de diseño. `browser_replay` la repite con valores nuevos (`{"buscar": "facturas de octubre"}`) sin percibir cada paso. Las contraseñas nunca se graban: al repetir, las escribe la persona.
 - **Botón "Enseñar" en el navegador.** Una pestaña pequeña en el borde izquierdo del Chrome del agente empieza a grabar sin pedírselo al agente. Pones nombre a la receta en el banner, pulsas Terminar y luego le dices a tu agente "repite <nombre>". Se oculta con `AGENT_TEACH_BUTTON=0`.
@@ -140,7 +140,7 @@ Funciona con tu suscripción de Claude (`claude setup-token`) o con una API key.
 | `browser_scroll` / `browser_drag` | Rueda del ratón; arrastrar y soltar |
 | `browser_select` / `browser_upload` | Opciones de `<select>`; subida de archivos |
 | `browser_navigate` / `browser_history` / `browser_tabs` | Navegación y pestañas |
-| `browser_read` / `browser_eval` | Texto legible (marcado como contenido no confiable); JS arbitrario |
+| `browser_read` / `browser_eval` | Texto legible (marcado como contenido no confiable); JS arbitrario (solo con `AGENT_ALLOW_EVAL=1`) |
 | `browser_extract` | Tabla o lista repetida → filas JSON o CSV (título, url, precio, imagen…). `file` lo guarda en disco |
 | `browser_teach_start` / `browser_teach_stop` | Graba una tarea que la persona hace una vez, como receta reutilizable |
 | `browser_recipes` / `browser_replay` | Lista o muestra recetas; repite una con `params` nuevos casi sin gastar tokens |
@@ -175,10 +175,13 @@ Funciona con tu suscripción de Claude (`claude setup-token`) o con una API key.
 | `AGENT_EXPORTS` | `~/.agentic-browser/exports` | Carpeta donde `browser_extract` guarda archivos |
 | `AGENT_READONLY` | `0` | `1` desactiva toda herramienta que modifique la página |
 | `AGENT_ALLOWED_ORIGINS` | — | Lista blanca de dominios, p. ej. `wikipedia.org,localhost` (incluye subdominios) |
-| `AGENT_DIALOGS` | `accept` | `alert/confirm/prompt`: `accept` o `dismiss` |
+| `AGENT_DIALOGS` | `dismiss` | `alert/confirm/prompt`: `dismiss` (por defecto desde 1.1.0: un `confirm("¿Borrar?")` nunca se acepta solo) o `accept`. El texto del diálogo llega al agente en los eventos |
 | `AGENT_TRACE` | `~/.agentic-browser/trace.jsonl` | Registro de auditoría de cada llamada |
 | `AGENT_CHROME` | autodetectado | Ruta al navegador. Sirve cualquier Chromium: Chrome, Edge (se usa solo si no hay Chrome), Brave, Chromium |
-| `AGENT_HTTP_PORT` / `AGENT_TOKEN` | `8787` / — | Puerto HTTP y token Bearer opcional |
+| `AGENT_HTTP_PORT` / `AGENT_TOKEN` | `8787` / generado | Puerto HTTP y token Bearer **obligatorio**. Sin `AGENT_TOKEN` se genera uno en `~/.agentic-browser/http-token` (ruta cambiable con `AGENT_TOKEN_FILE`). Se rechazan las peticiones que vienen de páginas web |
+| `AGENT_NO_SANDBOX` | `0` | `1` arranca Chrome sin su sandbox. Solo para Linux como root o contenedores donde el sandbox no arranca; reduce el aislamiento |
+| `AGENT_ALLOW_EVAL` | `0` | `1` activa `browser_eval` (desactivada por defecto: puede leer cookies y sacar datos) |
+| `AGENT_UPLOAD_DIRS` | carpeta de descargas | Carpetas desde las que `browser_upload` puede subir archivos, separadas por `;` en Windows y `:` en macOS/Linux |
 | `AGENT_RECORDINGS` | `~/.agentic-browser/recordings` | Carpeta donde `browser_record_stop` guarda los vídeos |
 | `AGENT_FFMPEG` | `ffmpeg` | Ruta a ffmpeg para grabar en MP4; `none` fuerza el WebM sin dependencias |
 
@@ -195,7 +198,7 @@ Funciona con tu suscripción de Claude (`claude setup-token`) o con una API key.
 Basada en las quejas más frecuentes sobre los agentes de navegador (refs obsoletos, exceso de tokens, popups, conflictos entre agentes, inyección de instrucciones, observabilidad):
 
 - [x] **Vigilante de chats** para cuentas propias del agente: despierta con cero tokens ante mensajes nuevos y responde bajo una política aplicada en código (borrador por defecto, lista blanca, palabras sensibles, límite por hora, bloqueo de dominio). Ver [docs/WATCHER.md](docs/WATCHER.md).
-- [x] Modo enseñar y repetición de recetas, extracción estructurada y contador de tokens en vivo (1.1).
+- [x] Modo enseñar y repetición de recetas, extracción estructurada, contador de tokens en vivo, cierre de popups y `browser_batch` (1.2).
 - [ ] Sesiones multi-agente sobre un mismo perfil, con pestañas con dueño.
 - [ ] `browser_batch`: varias acciones en una sola llamada.
 - [ ] Detección de texto oculto con CSS como señal de inyección de instrucciones.

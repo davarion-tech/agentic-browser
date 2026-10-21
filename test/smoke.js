@@ -14,7 +14,7 @@ const transport = new StdioClientTransport({
   command: process.execPath,
   args: [path.join(here, '..', 'src', 'mcp.js')],
   env: { ...process.env, AGENT_HEADLESS: process.env.AGENT_HEADLESS ?? '1',
-    AGENT_PROFILE: fs.mkdtempSync(path.join(os.tmpdir(), 'ab-')), AGENT_CURSOR_SPEED: '40',
+    AGENT_PROFILE: fs.mkdtempSync(path.join(os.tmpdir(), 'ab-')), AGENT_CURSOR_SPEED: '40', AGENT_ALLOW_EVAL: '1', AGENT_TEACH_TOKEN: 'test-token',
     AGENT_RECIPES: fs.mkdtempSync(path.join(os.tmpdir(), 'ab-recipes-')), AGENT_EXPORTS: fs.mkdtempSync(path.join(os.tmpdir(), 'ab-exports-')) },
   stderr: 'inherit',
 });
@@ -25,7 +25,8 @@ const call = async (name, args = {}) => {
   const r = await client.callTool({ name, arguments: args });
   const c = r.content[0];
   if (r.isError) throw new Error(`${name}: ${c.text}`);
-  return c.type === 'text' ? c.text : c;
+  // El contenido de la web llega delimitado como no confiable; aquí solo interesa lo de dentro
+  return c.type === 'text' ? c.text.replace(/^<page_content[^>]*>\n([\s\S]*)\n<\/page_content>$/, '$1') : c;
 };
 const refOf = (snap, re) => { const l = snap.split('\n').find(l => re.test(l)); assert.ok(l, `no encuentro ${re} en:\n${snap}`); return l.match(/^\[([^\]]+)\]/)[1]; };
 
@@ -133,10 +134,11 @@ assert.ok(st.ratio > 1 && st.perceptions > 5 && st.tokensPerScreenshot === 1365,
 console.log(await call('browser_teach_start', { name: 'smoke-saludo' }));
 assert.equal(await call('browser_eval', { expression: 'window.__agentCursor.state().teach' }), '"smoke-saludo"');
 await call('browser_type', { ref: (await call('browser_find', { query: 'Nombre' })).match(/\[(\d+)\] textbox/)[1], text: 'Ana' });
-await call('browser_select', { ref: (await call('browser_find', { query: 'Plan' })).match(/\[(\d+)\] select/)[1], values: ['Pro'] });
+// Solo se graban eventos reales (isTrusted): el select se cambia con el teclado, como una persona
+await call('browser_press', { keys: 'Tab ArrowDown' });
 await call('browser_click', { ref: (await call('browser_find', { query: 'Saludar' })).match(/\[(\d+)\] button/)[1] });
 assert.match(await call('browser_read', { selector: '#saludo' }), /Hola, Ana \(Pro\)/);
-await call('browser_eval', { expression: 'window.__agentTeachEmit({ ctrl: "done" }), 1' });
+await call('browser_eval', { expression: 'window.__agentTeachEmit({ ctrl: "done", token: "test-token" }), 1' });
 const learned = await call('browser_teach_stop');
 console.log(learned);
 assert.match(learned, /receta "smoke_saludo" — 3 pasos/);
@@ -153,21 +155,27 @@ assert.match(replay, /receta "smoke_saludo": 3\/3 pasos/);
 assert.match(await call('browser_read', { selector: '#saludo' }), /Hola, Luis \(Pro\)/);
 assert.ok(JSON.parse(await call('browser_stats')).perceptions >= st.perceptions + 3);
 
-// Las contraseñas nunca se graban
-await call('browser_teach_start', { name: 'smoke-secreto' });
-await call('browser_type', { ref: (await call('browser_find', { query: 'Clave' })).match(/\[(\d+)\] password/)[1], text: 's3creta-123', submit: true });
-await call('browser_eval', { expression: 'window.__agentTeachEmit({ ctrl: "done" }), 1' });
-const secret = await call('browser_teach_stop');
-console.log(secret);
-assert.match(secret, /— 2 pasos[\s\S]*1\. dato secreto en password "Clave" \(lo escribe la persona\)\n2\. tecla Enter/);
-assert.doesNotMatch(fs.readFileSync(secret.match(/guardada en (.+)$/m)[1], 'utf8'), /s3creta/);
+// Las contraseñas nunca se graban (el agente ni siquiera puede escribirlas: lo comprobamos con la receta)
+const { Teacher } = await import('../src/teach.js');
+const fake = new Teacher({}).build({ name: 'x', label: 'x', startUrl: 'about:blank', events: [
+  { action: 'type', target: { role: 'password', name: 'Clave' }, value: null, secret: true },
+  { action: 'type', target: { role: 'password', name: 'Clave' }, value: null, secret: true },
+  { action: 'press', key: 'Enter' }] });
+assert.deepEqual(fake.steps, [{ action: 'type', target: { role: 'password', name: 'Clave' }, secret: true }, { action: 'press', key: 'Enter' }]);
+assert.deepEqual(fake.params, {});
+// La página no puede inventar pasos ni controlar la grabación: sin el token se ignora
+await call('browser_eval', { expression: 'window.__agentTeachEmit({ ctrl: "start" }), 1' });
+await call('browser_wait', { ms: 300 });
+assert.equal(await call('browser_eval', { expression: 'window.__agentCursor.state().teach' }), 'null');
+assert.equal(await call('browser_eval', { expression: '(window.__agentCursor = null, typeof window.__agentCursor)' }), '"object"');
+
 // Botón "Enseñar": lo empieza la persona, sin el agente; al pulsar Terminar se guarda sola y avisa
 await call('browser_events');
-await call('browser_eval', { expression: 'window.__agentTeachEmit({ ctrl: "start" }), 1' });
+await call('browser_eval', { expression: 'window.__agentTeachEmit({ ctrl: "start", token: "test-token" }), 1' });
 await call('browser_wait', { ms: 400 });
 assert.match(await call('browser_eval', { expression: 'window.__agentCursor.state().teach' }), /^"tarea-\d{4}-\d\d-\d\d-\d{4}"$/);
 await call('browser_click', { ref: (await call('browser_find', { query: 'Saludar' })).match(/\[(\d+)\] button/)[1] });
-await call('browser_eval', { expression: 'window.__agentTeachEmit({ ctrl: "done", name: "Saludar con botón" }), 1' });
+await call('browser_eval', { expression: 'window.__agentTeachEmit({ ctrl: "done", name: "Saludar con botón", token: "test-token" }), 1' });
 await call('browser_wait', { ms: 600 });
 assert.match(await call('browser_events'), /"recipe-saved","name":"saludar_con_boton","steps":1/);
 assert.match(await call('browser_recipes', { name: 'saludar_con_boton' }), /1\. clic en button "Saludar"/);
@@ -237,7 +245,7 @@ assert.doesNotMatch(await call('browser_events'), /background-tab/);
 // Popups: se cierran solos tras navegar (cerrar/rechazar, nunca aceptar ni suscribirse)
 const nav = await call('browser_navigate', { url: pathToFileURL(path.join(here, 'popups.html')).href });
 console.log(nav);
-assert.match(nav, /🧹 cerré popups: “Cerrar”.*“Rechazar todo”/);
+assert.match(nav, /🧹[\s\S]*cerré popups: “Cerrar”.*“Rechazar todo”/);
 await call('browser_wait', { ms: 2500 });
 const late = await call('browser_snapshot');
 assert.match(nav + late, /“No, gracias”/); // el que llega tarde: al navegar o en la siguiente percepción
