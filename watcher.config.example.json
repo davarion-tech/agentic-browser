@@ -15,6 +15,9 @@
   "maxStepsPerEvent": 25,
   "pollSeconds": 4,
   "notifyWebhook": null,
+  "contacts": [],
+  "notifyOnScreen": true,
+  "record": false,
   "channels": [
     {
       "name": "whatsapp",

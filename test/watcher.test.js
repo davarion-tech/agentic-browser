@@ -105,6 +105,41 @@ const box = await page.evaluate(() => document.getElementById('box').value);
 assert.equal(box, 'El sábado abrimos de 10 a 14.\nSaludos', 'el borrador debía quedar en la caja');
 console.log('ronda 2 OK (borrador):', JSON.stringify(box));
 
+// ---- Ronda 3: solo chats vigilados, comprobado en la página; aviso en pantalla y vídeo del aviso ----
+const mockCh = { name: 'mock', url, unread: { type: 'title' }, rows: '#side button', rowUnread: '\\d$', chatTitle: '#who' };
+await page.evaluate(() => window.__incoming('Pedro', 'Hola, soy un contacto personal'));
+const idle = scriptedClient([]);
+const w4 = new ChatWatcher({ ...base, channels: [mockCh], contacts: ['Sofia'], record: { maxSeconds: 60 } }, { client: idle, browser: ab });
+await w4.openChannels();
+await w4.tick();
+assert.equal(idle.calls || 0, 0, 'un mensaje fuera de los chats vigilados no debe despertar al modelo');
+const readLog = () => fs.readFileSync(base.logFile, 'utf8').trim().split('\n').map(JSON.parse);
+let log4 = readLog();
+assert.equal(log4.at(-1).type, 'ignored');
+await page.evaluate(() => window.__incoming('Sofia', '¿Tienen mesa para 4?'));
+const client4 = scriptedClient([
+  () => ['browser_snapshot', {}],
+  t => ['browser_click', { ref: ref(t, /button "Pedro/) }],
+  () => ['browser_snapshot', {}],
+  t => ['send_reply', { box_ref: ref(t, /textbox/), contact: 'Sofia', incoming: 'x', reply: 'Esto no debe escribirse' }],  // miente sobre el chat
+  () => ['browser_snapshot', {}],
+  t => ['browser_click', { ref: ref(t, /button "Sofia/) }],
+  () => ['browser_snapshot', {}],
+  t => ['send_reply', { box_ref: ref(t, /textbox/), contact: 'Sofia', incoming: '¿Tienen mesa para 4?', reply: 'Sí, ¿a qué hora?' }],
+  () => ['finish', { summary: 'borrador para Sofia' }],
+]);
+w4.client = client4;
+await w4.tick();
+log4 = readLog();
+assert.ok(log4.some(e => e.type === 'blocked' && /vigilados/.test(e.detail)), 'debía bloquear el chat de Pedro');
+assert.equal(await page.evaluate(() => document.getElementById('box').value), 'Sí, ¿a qué hora?');
+const recLog = log4.find(e => e.type === 'recording');
+assert.ok(recLog, 'debía grabar el aviso: ' + JSON.stringify(log4.filter(e => e.type === 'error')));
+const recFile = recLog.detail.replace(/ \([\d.]+s\)$/, '');
+assert.ok(fs.statSync(recFile).size > 1000, 'el vídeo debía existir');
+fs.rmSync(recFile, { force: true });
+console.log('ronda 3 OK (chats vigilados, vídeo):', recLog.detail);
+
 // ---- Límite por hora ----
 const w3 = new ChatWatcher({ ...base, mode: 'auto', allowlist: ['*'], maxRepliesPerHour: 1 }, { client: scriptedClient([]), browser: ab });
 w3.sent = [Date.now()];

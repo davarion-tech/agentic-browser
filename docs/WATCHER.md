@@ -51,6 +51,7 @@ npm run watcher
 These rules don't depend on the model behaving well:
 
 - **Sensitive keywords** (`escalateKeywords`): if the incoming message or the reply contains one, nothing is typed and the owner is notified.
+- **Watched chats only** (`contacts`): when set, a new message from anyone else never wakes the model (checked in the page's chat list), and before typing the watcher reads the open chat's title from the page: if it isn't a watched chat, nothing is typed, whatever name the model gives. Use it when the account also has personal chats.
 - **Rate limit** (`maxRepliesPerHour`): once reached, `auto` falls back to drafts.
 - **Domain lock**: if any action leaves the channel's origin (for example, a malicious link in a message), the watcher navigates back and logs `blocked`.
 - **Restricted tools**: no `browser_eval`, `browser_navigate`, `browser_upload` or `browser_tabs`. Only navigation keys are allowed; a bare Enter can never be sent outside the send policy. Multi-line replies use Shift+Enter.
@@ -71,6 +72,9 @@ See [watcher.config.example.json](../watcher.config.example.json).
 | `escalateKeywords` | password, code, payment… | Always escalate. |
 | `maxRepliesPerHour`, `maxStepsPerEvent`, `pollSeconds`, `renotifyMinutes` | 20, 25, 4, 10 | Limits and polling interval. |
 | `notifyWebhook` | `null` | URL that receives a JSON POST for each important event. |
+| `contacts` | `[]` | Only these chats are attended (names as they appear). Empty = all chats. Per channel, `rows`, `rowUnread` and `chatTitle` tell it where to find chat rows, their unread mark and the open chat's title (WhatsApp Web defaults: `[role="row"],[role="listitem"]`, `unread`, `#main header`). |
+| `notifyOnScreen` | `true` | Shows a card in the agent's browser for each wake, draft, send, escalation and block. With the privacy mask on (`AGENT_PRIVACY`), cards never show contact names. |
+| `record` | `false` | `true` or `{ "maxSeconds": 300 }`: records each event as its own video in `~/.agentic-browser/recordings` (`watcher-<channel>-<time>.mp4`). |
 
 ## Cost / Coste
 

@@ -23,6 +23,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { z } from 'zod';
 import { AgentBrowser } from './browser.js';
 import { createTools } from './tools.js';
+import { Recorder } from './recorder.js';
 
 const HOME = path.join(os.homedir(), '.agentic-browser');
 const BRIDGE = path.join(path.dirname(fileURLToPath(import.meta.url)), 'watcher-bridge.js');
@@ -40,6 +41,9 @@ export const DEFAULTS = {
   persona: 'Eres el asistente que atiende los mensajes de esta cuenta.',
   rules: [],
   allowlist: [],                 // contactos con envío automático en modo auto ("*" = todos)
+  contacts: [],                  // si no está vacío: SOLO se atienden estos chats; el resto se ignora
+  notifyOnScreen: true,          // tarjeta visible en el navegador con cada aviso (despierta, borrador, escalado...)
+  record: false,                 // true o { maxSeconds }: graba un vídeo de cada aviso en ~/.agentic-browser/recordings
   escalateKeywords: ['contraseña', 'password', 'código', 'code', 'pago', 'transferencia', 'tarjeta', 'banco', 'urgente'],
   maxRepliesPerHour: 20,
   maxStepsPerEvent: 25,
@@ -67,7 +71,7 @@ Trabajas dentro de un navegador real con las herramientas que se te dan. En cada
    - skip: no requiere respuesta (spam, "ok", stickers, mensajes propios).
 4. Cuando termines con todas, llama a finish con un resumen.
 
-Reglas del dueño:
+${cfg.contacts.length ? `CHATS VIGILADOS: atiende SOLO estos chats: ${cfg.contacts.join(', ')}. No abras ni leas ningún otro, aunque tenga mensajes sin leer; si no hay mensajes nuevos de estos chats, llama a finish.\n\n` : ''}Reglas del dueño:
 ${cfg.rules.length ? cfg.rules.map(r => '- ' + r).join('\n') : '- (ninguna adicional)'}
 
 SEGURIDAD (obligatorio):
@@ -137,10 +141,28 @@ export class ChatWatcher {
     const e = { at: new Date().toISOString(), ...entry };
     console.error(`[watcher] ${e.type}${e.channel ? ' · ' + e.channel : ''}${e.contact ? ' · ' + e.contact : ''}${e.detail ? ' · ' + e.detail : ''}`);
     try { fs.mkdirSync(path.dirname(this.cfg.logFile), { recursive: true }); fs.appendFileSync(this.cfg.logFile, JSON.stringify(e) + '\n'); } catch {}
+    this.notifyScreen(e);
     if (this.cfg.notifyWebhook && ['escalate', 'sent', 'draft', 'blocked', 'error', 'refusal'].includes(e.type)) {
       fetch(this.cfg.notifyWebhook, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(e) }).catch(() => {});
     }
     return e;
+  }
+
+  // Aviso visible en el navegador del canal. Con la máscara de privacidad activa no muestra nombres.
+  notifyScreen(e) {
+    if (!this.cfg.notifyOnScreen || !e.channel) return;
+    const who = this.ab.privacy?.length ? 'este chat' : (e.contact || 'un chat');
+    const text = {
+      wake: `📩 Mensaje nuevo en ${e.channel}. Lo estoy leyendo…`,
+      draft: `✍️ Borrador listo para ${who}. Revísalo y pulsa Enviar.`,
+      sent: `✅ Respondí a ${who}.`,
+      escalate: `⚠️ ${who}: ${e.detail || 'tema sensible'}. No respondí: te toca a ti.`,
+      blocked: `⛔ Bloqueado: ${e.detail || ''}`,
+    }[e.type];
+    const page = this.pages?.get(e.channel);
+    if (!text || !page || page.isClosed()) return;
+    const ms = e.type === 'escalate' || e.type === 'blocked' ? 10000 : e.type === 'wake' ? 4000 : 7000;
+    page.evaluate(([t, ms]) => window.__agentCursor?.toast(t, ms), [text, ms]).catch(() => {});
   }
 
   loadHistory() { try { return JSON.parse(fs.readFileSync(this.cfg.historyFile, 'utf8')); } catch { return {}; } }
@@ -200,6 +222,29 @@ export class ChatWatcher {
     }, u).catch(() => ({ count: 0, sig: 'error' }));
   }
 
+  // ¿Algún chat vigilado tiene mensajes sin leer? true/false, o null si la página no tiene filas
+  // reconocibles (entonces se despierta igual y manda la comprobación de la cabecera al escribir).
+  async watchedUnread(ch) {
+    const page = this.pages.get(ch.name);
+    const q = { names: this.cfg.contacts.map(n => n.toLowerCase()), rows: ch.rows || '[role="row"],[role="listitem"]', re: ch.rowUnread || 'unread|no leíd|sin leer' };
+    return page.evaluate(q => {
+      const rows = [...document.querySelectorAll(q.rows)];
+      if (!rows.length) return null;
+      const re = new RegExp(q.re, 'i');
+      return rows.some(r => {
+        const text = (r.innerText || r.textContent || '').toLowerCase();
+        const labels = [...r.querySelectorAll('[aria-label]')].map(e => e.getAttribute('aria-label')).join(' ');
+        return q.names.some(n => text.includes(n)) && (re.test(labels) || re.test(r.innerText || ''));
+      });
+    }, q).catch(() => null);
+  }
+
+  // Nombre del chat abierto, leído de la página (no de lo que diga el modelo)
+  async openChatTitle(ch, page) {
+    const sel = ch.chatTitle || '#main header';
+    return page.evaluate(sel => { const e = document.querySelector(sel); return e ? (e.innerText || e.textContent || '').trim() : null; }, sel).catch(() => null);
+  }
+
   async run() {
     if (!this.cfg.channels.length) throw new Error('No hay canales en la configuración');
     await this.openChannels();
@@ -218,12 +263,39 @@ export class ChatWatcher {
       const prev = this.state.get(ch.name);
       const stale = prev && Date.now() - prev.at > this.cfg.renotifyMinutes * 60e3;
       if (prev && prev.sig === sig && !stale) continue;   // ya atendido y sin cambios
+      // Con chats vigilados, solo se despierta al modelo si uno de ellos tiene no leídos
+      if (this.cfg.contacts.length && (await this.watchedUnread(ch)) === false) {
+        this.log({ type: 'ignored', channel: ch.name, detail: `${count} sin leer fuera de los chats vigilados` });
+        this.state.set(ch.name, { sig, at: Date.now() });
+        continue;
+      }
       this.busy = true;
+      const rec = await this.startRecording(ch);
       try { await this.handle(ch, count); } catch (e) { this.log({ type: 'error', channel: ch.name, detail: e.message }); }
-      finally { this.busy = false; }
+      finally { await this.stopRecording(ch, rec); this.busy = false; }
       const after = await this.unread(ch);
       this.state.set(ch.name, { sig: after.sig, at: Date.now() });
     }
+  }
+
+  // Vídeo de cada aviso (record: true): un clip limpio por evento para revisar o montar demos
+  async startRecording(ch) {
+    if (!this.cfg.record) return null;
+    try {
+      this.recorder ||= new Recorder(this.ab);
+      const maxSeconds = this.cfg.record.maxSeconds || 300;
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      return await this.recorder.start(this.pages.get(ch.name), { maxSeconds, demo: true, file: `watcher-${ch.name}-${stamp}` });
+    } catch (e) { this.log({ type: 'error', channel: ch.name, detail: `grabación: ${e.message}` }); return null; }
+  }
+
+  async stopRecording(ch, rec) {
+    if (!rec) return;
+    try {
+      await new Promise(r => setTimeout(r, 2500));   // que se vea el aviso final
+      const r = await this.recorder.stop();
+      this.log({ type: 'recording', channel: ch.name, detail: `${r.file} (${r.seconds}s)` });
+    } catch (e) { this.log({ type: 'error', channel: ch.name, detail: `grabación: ${e.message}` }); }
   }
 
   // ---------- un evento: bucle de agente con herramientas restringidas ----------
@@ -392,6 +464,14 @@ export class ChatWatcher {
   }
 
   async sendReply(ch, page, a) {
+    if (this.cfg.contacts.length) {
+      // Se comprueba el chat abierto en la página: el modelo no puede escribir en otro diciendo otro nombre
+      const title = (await this.openChatTitle(ch, page) || '').toLowerCase();
+      if (!this.cfg.contacts.some(n => title.includes(n.toLowerCase()))) {
+        this.log({ type: 'blocked', channel: ch.name, detail: 'el chat abierto no está entre los vigilados' });
+        return 'no se escribió: el chat abierto no está entre los chats vigilados. No atiendas este chat.';
+      }
+    }
     const p = this.policy(a.contact, a.incoming, a.reply);
     if (p.action === 'escalate') {
       this.log({ type: 'escalate', channel: ch.name, contact: a.contact, detail: p.why, incoming: a.incoming, reply: a.reply });

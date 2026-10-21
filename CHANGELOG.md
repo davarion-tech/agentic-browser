@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Added
 - **Privacy mask for recordings and screen sharing.** `browser_cursor_style({ privacy: "whatsapp" })` (or `AGENT_PRIVACY=whatsapp`) blurs the chat list, the open chat's header and profile photos on WhatsApp Web, so a demo or a shared screen never shows contacts or numbers. Presets: `whatsapp`, `telegram`, `gmail` (each only on its own domain); any other value is a CSS selector applied on every page; `"off"` removes it. Only people see the blur: the agent still reads the page. Pages opened afterwards are blurred before they paint.
+- **Watcher: watched chats only.** `contacts` limits the watcher to the chats you name. A message from anyone else doesn't wake the model, and before typing the watcher checks the open chat's title in the page, so it can't write in another chat whatever the model says. Safe to run on an account that also has personal chats.
+- **Watcher: on-screen notices.** A card in the agent's browser for every wake, draft ("review it and press Send"), send, escalation ("I didn't reply: your call") and block. Names are hidden when the privacy mask is on. `notifyOnScreen: false` turns them off.
+- **Watcher: a video per event.** `record: true` saves each wake-up, from the new message to the draft or escalation, as its own clip.
 
 ## [1.2.0] - 2026-10-21
 
