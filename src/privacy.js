@@ -4,8 +4,9 @@
 export const PRIVACY_PRESETS = {
   whatsapp: {
     hosts: ['web.whatsapp.com'],
-    // Lista de chats y resultados de búsqueda, cabecera del chat abierto (nombre y foto) y fotos de perfil
-    selectors: ['#pane-side', '[aria-label="Chat list"]', '[aria-label="Lista de chats"]', '#main header', 'img[src*="pps.whatsapp.net"]'],
+    // Lista de chats y resultados de búsqueda, cabecera del chat abierto (nombre y foto),
+    // tu foto en la barra lateral y cualquier foto de perfil
+    selectors: ['#pane-side', '[aria-label="Chat list"]', '[aria-label="Lista de chats"]', '#main header', 'header img', 'img[src*="whatsapp.net"]'],
   },
   telegram: {
     hosts: ['web.telegram.org'],
@@ -21,6 +22,8 @@ export const PRIVACY_PRESETS = {
 // "whatsapp", "whatsapp,gmail", ["telegram", ".mi-selector"], "off" -> [{ hosts, sel }]
 export function privacyRules(spec) {
   if (spec == null || spec === false) return [];
+  // Algunos clientes MCP mandan la lista como texto JSON
+  if (typeof spec === 'string' && spec.trim().startsWith('[')) { try { spec = JSON.parse(spec); } catch {} }
   const items = (Array.isArray(spec) ? spec : String(spec).split(',')).map(s => String(s).trim()).filter(Boolean);
   const rules = [];
   for (const it of items) {
