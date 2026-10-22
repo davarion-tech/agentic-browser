@@ -73,7 +73,7 @@ See [watcher.config.example.json](../watcher.config.example.json).
 | `maxRepliesPerHour`, `maxStepsPerEvent`, `pollSeconds`, `renotifyMinutes` | 20, 25, 4, 10 | Limits and polling interval. |
 | `notifyWebhook` | `null` | URL that receives a JSON POST for each important event. |
 | `contacts` | `[]` | Only these chats are attended (names as they appear). Empty = all chats. Per channel, `rows`, `rowUnread` and `chatTitle` tell it where to find chat rows, their unread mark and the open chat's title (WhatsApp Web defaults: `[role="row"],[role="listitem"]`, `unread`, `#main header`). |
-| `notifyOnScreen` | `true` | Shows a card in the agent's browser for each wake, draft, send, escalation and block. With the privacy mask on (`AGENT_PRIVACY`), cards never show contact names. |
+| `notifyOnScreen` | `true` | Shows a card in the agent's browser for each wake, draft, send, escalation and block. With the privacy mask on (`AGENT_PRIVACY`), cards never show contact names. `notifyLang`: `es` (default) or `en`. |
 | `record` | `false` | `true` or `{ "maxSeconds": 300 }`: records each event as its own video in `~/.agentic-browser/recordings` (`watcher-<channel>-<time>.mp4`). |
 
 ## Cost / Coste

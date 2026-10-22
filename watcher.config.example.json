@@ -17,6 +17,7 @@
   "notifyWebhook": null,
   "contacts": [],
   "notifyOnScreen": true,
+  "notifyLang": "es",
   "record": false,
   "channels": [
     {

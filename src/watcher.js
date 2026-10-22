@@ -43,6 +43,7 @@ export const DEFAULTS = {
   allowlist: [],                 // contactos con envío automático en modo auto ("*" = todos)
   contacts: [],                  // si no está vacío: SOLO se atienden estos chats; el resto se ignora
   notifyOnScreen: true,          // tarjeta visible en el navegador con cada aviso (despierta, borrador, escalado...)
+  notifyLang: 'es',              // idioma de esas tarjetas: "es" o "en"
   record: false,                 // true o { maxSeconds }: graba un vídeo de cada aviso en ~/.agentic-browser/recordings
   escalateKeywords: ['contraseña', 'password', 'código', 'code', 'pago', 'transferencia', 'tarjeta', 'banco', 'urgente'],
   maxRepliesPerHour: 20,
@@ -151,14 +152,24 @@ export class ChatWatcher {
   // Aviso visible en el navegador del canal. Con la máscara de privacidad activa no muestra nombres.
   notifyScreen(e) {
     if (!this.cfg.notifyOnScreen || !e.channel) return;
-    const who = this.ab.privacy?.length ? 'este chat' : (e.contact || 'un chat');
-    const text = {
+    const en = this.cfg.notifyLang === 'en';
+    const who = this.ab.privacy?.length ? (en ? 'this chat' : 'este chat') : (e.contact || (en ? 'a chat' : 'un chat'));
+    // El motivo lo escribe el modelo y puede ser largo: la tarjeta solo enseña el principio
+    const why = (e.detail || (en ? 'sensitive topic' : 'tema sensible')).replace(/\s+/g, ' ').trim();
+    const short = why.length > 110 ? why.slice(0, 107).replace(/\s+\S*$/, '') + '…' : why.replace(/[.\s]+$/, '');
+    const text = (en ? {
+      wake: `📩 New message in ${e.channel}. Reading it…`,
+      draft: `✍️ Draft ready for ${who}. Review it and press Send.`,
+      sent: `✅ Replied to ${who}.`,
+      escalate: `⚠️ ${short}. I didn't reply: your call.`,
+      blocked: `⛔ Blocked: ${short}`,
+    } : {
       wake: `📩 Mensaje nuevo en ${e.channel}. Lo estoy leyendo…`,
       draft: `✍️ Borrador listo para ${who}. Revísalo y pulsa Enviar.`,
       sent: `✅ Respondí a ${who}.`,
-      escalate: `⚠️ ${who}: ${e.detail || 'tema sensible'}. No respondí: te toca a ti.`,
-      blocked: `⛔ Bloqueado: ${e.detail || ''}`,
-    }[e.type];
+      escalate: `⚠️ ${short}. No respondí: te toca a ti.`,
+      blocked: `⛔ Bloqueado: ${short}`,
+    })[e.type];
     const page = this.pages?.get(e.channel);
     if (!text || !page || page.isClosed()) return;
     const ms = e.type === 'escalate' || e.type === 'blocked' ? 10000 : e.type === 'wake' ? 4000 : 7000;
@@ -179,7 +190,7 @@ export class ChatWatcher {
   policy(contact, incoming, reply) {
     const text = `${incoming}\n${reply}`.toLowerCase();
     const kw = this.cfg.escalateKeywords.find(k => text.includes(k.toLowerCase()));
-    if (kw) return { action: 'escalate', why: `palabra sensible "${kw}"` };
+    if (kw) return { action: 'escalate', why: this.cfg.notifyLang === 'en' ? `sensitive keyword "${kw}"` : `palabra sensible "${kw}"` };
     if (this.cfg.mode === 'observe') return { action: 'escalate', why: 'modo observe: solo avisa' };
     const hourAgo = Date.now() - 3600e3;
     this.sent = this.sent.filter(t => t > hourAgo);
