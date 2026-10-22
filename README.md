@@ -129,13 +129,18 @@ viewport 1280x800 scroll=0,0 docH=2090
 [f1:1] button "Button inside iframe" @214,217
 ```
 
+## New in 1.3
+
+- **Privacy mask**. `browser_cursor_style({ privacy: "whatsapp" })` or `AGENT_PRIVACY=whatsapp` blurs contacts, chat headers and profile photos so you can record or share the agent's screen without exposing anyone. Presets: `whatsapp`, `telegram`, `gmail`, or your own CSS selectors. The agent still reads everything.
+- **Watch only the chats you choose.** In the chat watcher, `contacts: ["Cliente demo"]` keeps every other chat out: they never wake the model, and before typing the watcher reads the open chat's title from the page, so the agent can't write anywhere else. Safe on an account that also has personal chats.
+- **On-screen notices and a clip per event.** The watcher shows a card for each new message, draft ("review it and press Send"), escalation and block (no names while the privacy mask is on), and `record: true` saves each event as its own video.
+
 ## New in 1.2
 
 - **Teach it once, replay forever.** `browser_teach_start` records a task while *you* do it in the agent's Chrome (clicks, text, selects, Enter). It is saved as a recipe of roles and names, not pixels, so it survives layout changes. `browser_replay` repeats it with new values (`{"search": "October invoices"}`) without perceiving every step. Passwords are never recorded: on replay, the person types them.
 - **An "Enseñar" (teach) button in the browser.** A small tab on the left edge of the agent's Chrome starts a recording without asking the agent. Name the recipe in the banner, press Finish, then tell your agent "repeat <name>". Disable it with `AGENT_TEACH_BUTTON=0`.
 - **A clean screen.** Chrome's translate bar, search-engine choice, restore-pages bubble and permission prompts are off (permissions are denied). After every navigation, website popups (language, newsletter, cookie banners, "Sign in with Google") are closed with visible clicks on their close or reject button, never accept, subscribe or sign in. `browser_dismiss` does it on demand; `AGENT_AUTO_DISMISS=0` turns the automatic pass off.
 - **Structured data in one call.** `browser_extract` turns the most relevant table or repeated list (products, search results, contacts) into JSON or CSV rows with title, link, price and image. Merged table headers are resolved. CSV output is safe to open in Excel.
-- **Privacy mask** *(next release, on `main`)*. `browser_cursor_style({ privacy: "whatsapp" })` or `AGENT_PRIVACY=whatsapp` blurs contacts, chat headers and profile photos so you can record or share the agent's screen without exposing anyone. Presets: `whatsapp`, `telegram`, `gmail`, or your own CSS selectors. The agent still reads everything.
 - **Live token counter.** `browser_cursor_style({ hud: true })` (or `AGENT_HUD=1`) shows, in the corner of the page, the tokens used against what screenshots would have cost. `browser_stats` returns the same numbers. Formula: tokens ≈ characters / 4; one screenshot ≈ width × height / 750 per perception call.
 
 ## Tools

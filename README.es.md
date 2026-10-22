@@ -119,13 +119,18 @@ npm run watcher
 
 Funciona con tu suscripción de Claude (`claude setup-token`) o con una API key. Lee antes [docs/WATCHER.md](docs/WATCHER.md) y el [Aviso de responsabilidad](DISCLAIMER.md): muchas plataformas prohíben los bots no oficiales.
 
+## Novedades de la 1.3
+
+- **Máscara de privacidad**. `browser_cursor_style({ privacy: "whatsapp" })` o `AGENT_PRIVACY=whatsapp` difumina contactos, la cabecera del chat y las fotos de perfil para grabar o compartir la pantalla del agente sin exponer a nadie. Preajustes: `whatsapp`, `telegram`, `gmail`, o tus propios selectores CSS. El agente sigue leyéndolo todo.
+- **Vigila solo los chats que elijas.** En el vigilante, `contacts: ["Cliente demo"]` deja fuera todos los demás chats: no despiertan al modelo y, antes de escribir, el vigilante lee en la página el nombre del chat abierto, así que el agente no puede escribir en otro. Seguro en una cuenta que también tiene chats personales.
+- **Avisos en pantalla y un vídeo por evento.** El vigilante muestra una tarjeta por cada mensaje nuevo, borrador ("revísalo y pulsa Enviar"), escalado y bloqueo (sin nombres con la máscara activa), y `record: true` guarda cada evento como un vídeo.
+
 ## Novedades de la 1.2
 
 - **Enséñalo una vez y se repite siempre.** `browser_teach_start` graba una tarea mientras *tú* la haces en el Chrome del agente (clics, textos, selecciones, Enter). Se guarda como receta de roles y nombres, no de píxeles, así que aguanta cambios de diseño. `browser_replay` la repite con valores nuevos (`{"buscar": "facturas de octubre"}`) sin percibir cada paso. Las contraseñas nunca se graban: al repetir, las escribe la persona.
 - **Botón "Enseñar" en el navegador.** Una pestaña pequeña en el borde izquierdo del Chrome del agente empieza a grabar sin pedírselo al agente. Pones nombre a la receta en el banner, pulsas Terminar y luego le dices a tu agente "repite <nombre>". Se oculta con `AGENT_TEACH_BUTTON=0`.
 - **Pantalla limpia.** La barra de traducir, la elección de buscador, el aviso de restaurar páginas y las preguntas de permisos de Chrome vienen apagados (los permisos se deniegan). Tras cada navegación se cierran los popups de las webs (idioma, newsletter, cookies, "Inicia sesión con Google") con clics visibles en su botón de cerrar o rechazar, nunca aceptar, suscribirse ni iniciar sesión. `browser_dismiss` lo hace cuando quieras; `AGENT_AUTO_DISMISS=0` apaga el cierre automático.
 - **Datos estructurados en una llamada.** `browser_extract` convierte la tabla o lista repetida más relevante (productos, resultados, contactos) en filas JSON o CSV con título, enlace, precio e imagen. Resuelve cabeceras combinadas, y el CSV se puede abrir en Excel sin riesgo.
-- **Máscara de privacidad** *(próxima versión, ya en `main`)*. `browser_cursor_style({ privacy: "whatsapp" })` o `AGENT_PRIVACY=whatsapp` difumina contactos, la cabecera del chat y las fotos de perfil para grabar o compartir la pantalla del agente sin exponer a nadie. Preajustes: `whatsapp`, `telegram`, `gmail`, o tus propios selectores CSS. El agente sigue leyéndolo todo.
 - **Contador de tokens en vivo.** `browser_cursor_style({ hud: true })` (o `AGENT_HUD=1`) muestra en la esquina de la página los tokens usados frente a lo que habrían costado las capturas. `browser_stats` devuelve las mismas cifras. Fórmula: tokens ≈ caracteres / 4; una captura ≈ ancho × alto / 750 por cada percepción.
 
 ## Herramientas

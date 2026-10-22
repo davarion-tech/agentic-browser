@@ -3,7 +3,7 @@
 All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.3.0] - 2026-10-22
 
 ### Added
 - **Privacy mask for recordings and screen sharing.** `browser_cursor_style({ privacy: "whatsapp" })` (or `AGENT_PRIVACY=whatsapp`) blurs the chat list, the open chat's header and profile photos on WhatsApp Web, so a demo or a shared screen never shows contacts or numbers. Presets: `whatsapp`, `telegram`, `gmail` (each only on its own domain); any other value is a CSS selector applied on every page; `"off"` removes it. Only people see the blur: the agent still reads the page. Pages opened afterwards are blurred before they paint.
