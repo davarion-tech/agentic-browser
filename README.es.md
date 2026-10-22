@@ -121,6 +121,10 @@ Funciona con tu suscripción de Claude (`claude setup-token`) o con una API key.
 
 ## Novedades de la 1.3
 
+<p align="center"><a href="docs/media/agentic-browser-watcher.mp4"><img src="docs/assets/watcher-demo.gif" width="100%" alt="Demo del vigilante: redacta una respuesta, se niega a dar datos bancarios y a abrir un enlace de phishing"></a></p>
+
+El vigilante en un chat de demostración: redacta la respuesta para que tú la envíes y te pasa a ti las peticiones de datos bancarios y los enlaces de phishing. [Vídeo completo](docs/media/agentic-browser-watcher.mp4).
+
 - **Máscara de privacidad**. `browser_cursor_style({ privacy: "whatsapp" })` o `AGENT_PRIVACY=whatsapp` difumina contactos, la cabecera del chat y las fotos de perfil para grabar o compartir la pantalla del agente sin exponer a nadie. Preajustes: `whatsapp`, `telegram`, `gmail`, o tus propios selectores CSS. El agente sigue leyéndolo todo.
 - **Vigila solo los chats que elijas.** En el vigilante, `contacts: ["Cliente demo"]` deja fuera todos los demás chats: no despiertan al modelo y, antes de escribir, el vigilante lee en la página el nombre del chat abierto, así que el agente no puede escribir en otro. Seguro en una cuenta que también tiene chats personales.
 - **Avisos en pantalla y un vídeo por evento.** El vigilante muestra una tarjeta por cada mensaje nuevo, borrador ("revísalo y pulsa Enviar"), escalado y bloqueo (sin nombres con la máscara activa), y `record: true` guarda cada evento como un vídeo.

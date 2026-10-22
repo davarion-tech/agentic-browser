@@ -131,6 +131,10 @@ viewport 1280x800 scroll=0,0 docH=2090
 
 ## New in 1.3
 
+<p align="center"><a href="docs/media/agentic-browser-watcher.mp4"><img src="docs/assets/watcher-demo.gif" width="100%" alt="Chat watcher demo: drafts a reply, refuses to share bank details, refuses a phishing link"></a></p>
+
+The chat watcher on a demo chat: it drafts a reply for you to send, and hands bank-detail requests and phishing links to you. [Full video](docs/media/agentic-browser-watcher.mp4).
+
 - **Privacy mask**. `browser_cursor_style({ privacy: "whatsapp" })` or `AGENT_PRIVACY=whatsapp` blurs contacts, chat headers and profile photos so you can record or share the agent's screen without exposing anyone. Presets: `whatsapp`, `telegram`, `gmail`, or your own CSS selectors. The agent still reads everything.
 - **Watch only the chats you choose.** In the chat watcher, `contacts: ["Cliente demo"]` keeps every other chat out: they never wake the model, and before typing the watcher reads the open chat's title from the page, so the agent can't write anywhere else. Safe on an account that also has personal chats.
 - **On-screen notices and a clip per event.** The watcher shows a card for each new message, draft ("review it and press Send"), escalation and block (no names while the privacy mask is on), and `record: true` saves each event as its own video.
