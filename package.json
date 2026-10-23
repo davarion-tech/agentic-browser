@@ -4,6 +4,7 @@
   "description": "Agentic browser on top of your real Chrome: MCP + HTTP API, token-cheap text perception with pixel coordinates, and a visible agent cursor",
   "main": "src/mcp.js",
   "scripts": {
+    "build": "node -e \"console.log('agentic-browser: no build step needed')\"",
     "mcp": "node src/mcp.js",
     "http": "node src/http.js",
     "test": "node test/smoke.js && node test/security.test.js",
