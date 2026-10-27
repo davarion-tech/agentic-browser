@@ -119,6 +119,15 @@ npm run watcher
 
 Funciona con tu suscripción de Claude (`claude setup-token`) o con una API key. Lee antes [docs/WATCHER.md](docs/WATCHER.md) y el [Aviso de responsabilidad](DISCLAIMER.md): muchas plataformas prohíben los bots no oficiales.
 
+## Novedades de la 1.4: guarda lo que quieras de una página
+
+- **`browser_article`**: el contenido principal de cualquier página en Markdown limpio (título, autor, fecha, encabezados, listas, tablas, enlaces, imágenes), sin menús, anuncios ni pies. La forma más barata de que tu agente lea o resuma un artículo. `file` lo guarda como `.md`.
+- **`browser_pdf`**: guarda la página como **PDF** (A4/Carta/Legal, con fondos y con las imágenes diferidas ya cargadas) o como **MHTML** (un solo archivo, copia exacta). Usa la sesión del agente, así que sirve en páginas con login.
+- **`browser_media`**: todas las imágenes, vídeos, audios y documentos de la página (HTML, fondos CSS y lo que cargó la red), descargados en `images/`, `videos/`, `audio/` y `docs/` con un `manifest.json` (URL de origen, texto alternativo, tamaño, hash). Sin duplicados ni píxeles de seguimiento.
+- **`browser_video`**: descarga el vídeo de la página, archivos directos (MP4/WebM) o streams HLS/DASH que junta con ffmpeg. Se niega con contenido con DRM (Netflix, Disney+, Spotify…). Solo para vídeos tuyos o que tengas derecho a guardar: YouTube, TikTok, Instagram y otros prohíben descargar en sus términos.
+
+Todo se guarda en `~/.agentic-browser/exports` (`AGENT_EXPORTS`); `AGENT_MEDIA_MAX_MB` (500) limita cada archivo.
+
 ## Novedades de la 1.3
 
 <p align="center"><a href="docs/media/agentic-browser-watcher.mp4"><img src="docs/assets/watcher-demo.gif" width="100%" alt="Demo del vigilante: redacta una respuesta, se niega a dar datos bancarios y a abrir un enlace de phishing"></a></p>
@@ -152,6 +161,10 @@ El vigilante en un chat de demostración: redacta la respuesta para que tú la e
 | `browser_navigate` / `browser_history` / `browser_tabs` | Navegación y pestañas |
 | `browser_read` / `browser_eval` | Texto legible (marcado como contenido no confiable); JS arbitrario (solo con `AGENT_ALLOW_EVAL=1`) |
 | `browser_extract` | Tabla o lista repetida → filas JSON o CSV (título, url, precio, imagen…). `file` lo guarda en disco |
+| `browser_article` | Modo lectura: el contenido principal en Markdown limpio, para leer o resumir barato. `file` guarda un `.md` |
+| `browser_pdf` | Guarda la página como PDF o MHTML, con la sesión del agente |
+| `browser_media` | Descarga todas las imágenes, vídeos, audios y documentos, ordenados en carpetas con un `manifest.json`. `download:false` solo lista |
+| `browser_video` | Descarga el vídeo de la página: archivos directos o HLS/DASH con ffmpeg. Se niega con DRM. `list:true` muestra los candidatos |
 | `browser_teach_start` / `browser_teach_stop` | Graba una tarea que la persona hace una vez, como receta reutilizable |
 | `browser_recipes` / `browser_replay` | Lista o muestra recetas; repite una con `params` nuevos casi sin gastar tokens |
 | `browser_stats` | Tokens usados en la sesión frente al equivalente en capturas |
@@ -183,7 +196,8 @@ El vigilante en un chat de demostración: redacta la respuesta para que tú la e
 | `AGENT_HUD` | `0` | `1` muestra el contador de tokens desde el inicio |
 | `AGENT_PRIVACY` | — | Máscara de privacidad desde el inicio: `whatsapp`, `telegram`, `gmail` y/o selectores CSS, separados por comas |
 | `AGENT_RECIPES` | `~/.agentic-browser/recipes` | Carpeta de las recetas enseñadas (JSON) |
-| `AGENT_EXPORTS` | `~/.agentic-browser/exports` | Carpeta donde `browser_extract` guarda archivos |
+| `AGENT_EXPORTS` | `~/.agentic-browser/exports` | Carpeta donde guardan `browser_extract`, `browser_article`, `browser_pdf`, `browser_media` y `browser_video` |
+| `AGENT_MEDIA_MAX_MB` | `500` | Límite de tamaño por archivo descargado (multimedia y vídeo) |
 | `AGENT_READONLY` | `0` | `1` desactiva toda herramienta que modifique la página |
 | `AGENT_ALLOWED_ORIGINS` | — | Lista blanca de dominios, p. ej. `wikipedia.org,localhost` (incluye subdominios) |
 | `AGENT_DIALOGS` | `dismiss` | `alert/confirm/prompt`: `dismiss` (por defecto desde 1.1.0: un `confirm("¿Borrar?")` nunca se acepta solo) o `accept`. El texto del diálogo llega al agente en los eventos |

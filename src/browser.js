@@ -68,6 +68,7 @@ export class AgentBrowser {
     this.page = null;
     this.cursor = new WeakMap();     // page -> {x,y}
     this.consoleLog = new WeakMap(); // page -> [{type,text}]
+    this.netMedia = new WeakMap();   // page -> [{url,ct,bytes,status}] multimedia vista en la red
     this.events = [];                // diálogos, descargas, popups
     this.frameIds = new WeakMap();
     this.nextFrameId = 1;
@@ -106,6 +107,7 @@ export class AgentBrowser {
       this.context = this.browser.contexts()[0] || await this.browser.newContext();
     } else {
       const executablePath = findChrome();
+      this.chromePath = executablePath;
       if (!executablePath) throw new Error('No encuentro chrome.exe. Define AGENT_CHROME con la ruta.');
       fs.mkdirSync(this.opts.userDataDir, { recursive: true });
       fs.mkdirSync(this.opts.downloadsDir, { recursive: true });
@@ -198,6 +200,19 @@ export class AgentBrowser {
     this.consoleLog.set(page, []);
     page.on('console', m => { const l = this.consoleLog.get(page); l.push({ type: m.type(), text: m.text().slice(0, 500) }); if (l.length > 200) l.shift(); });
     page.on('pageerror', e => this.consoleLog.get(page).push({ type: 'pageerror', text: String(e).slice(0, 500) }));
+    // Multimedia que carga la página (imágenes, vídeo, audio, documentos, manifiestos HLS/DASH): browser_media y browser_video.
+    // Se vacía al navegar: solo cuenta lo de la página actual.
+    page.on('framenavigated', f => { if (f === page.mainFrame()) this.netMedia.set(page, []); });
+    page.on('response', r => {
+      try {
+        const h = r.headers(), ct = (h['content-type'] || '').split(';')[0].trim().toLowerCase();
+        if (!/^(image|video|audio)\/|mpegurl|dash\+xml|pdf|zip|msword|officedocument/.test(ct) && !/\.(m3u8|mpd)(\?|$)/i.test(r.url())) return;
+        const log = this.netMedia.get(page) || []; this.netMedia.set(page, log);
+        if (log.some(e => e.url === r.url())) return;
+        log.push({ url: r.url(), ct, bytes: Number(h['content-length'] || 0), status: r.status() });
+        if (log.length > 1500) log.shift();
+      } catch {}
+    });
     page.on('dialog', async d => {
       this.events.push({ type: 'dialog', kind: d.type(), message: d.message(), action: this.opts.dialogs });
       try { this.opts.dialogs === 'dismiss' ? await d.dismiss() : await d.accept(); } catch {}
@@ -440,6 +455,9 @@ export class AgentBrowser {
     }
     return null;
   }
+
+  mediaLog(page) { return (this.netMedia.get(page) || []).filter(e => e.status < 400); }
+  executablePath() { return this.chromePath || findChrome(); }
 
   drainEvents() { const e = this.events; this.events = []; return e; }
 

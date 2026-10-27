@@ -8,6 +8,7 @@ import path from 'node:path';
 import { formatSnapshot, diffSnapshot } from './perception.js';
 import { Recorder } from './recorder.js';
 import { Teacher } from './teach.js';
+import { articleInPage, savePdf, collectMedia, downloadVideo, outPath } from './save.js';
 
 const TRACE = process.env.AGENT_TRACE || path.join(os.homedir(), '.agentic-browser', 'trace.jsonl');
 const EXPORTS = process.env.AGENT_EXPORTS || path.join(os.homedir(), '.agentic-browser', 'exports');
@@ -23,7 +24,7 @@ const MUTATING = new Set(['browser_click', 'browser_type', 'browser_press', 'bro
 const CORE = ['browser_navigate', 'browser_snapshot', 'browser_find', 'browser_click', 'browser_type', 'browser_press',
   'browser_scroll', 'browser_read', 'browser_extract', 'browser_element_at', 'browser_watch', 'browser_request_human', 'browser_tabs'];
 // Herramientas que "miran" la página: un agente basado en capturas haría una captura en cada una
-const PERCEIVE = new Set(['browser_snapshot', 'browser_find', 'browser_read', 'browser_extract', 'browser_element_at', 'browser_cursor']);
+const PERCEIVE = new Set(['browser_snapshot', 'browser_find', 'browser_read', 'browser_extract', 'browser_article', 'browser_element_at', 'browser_cursor']);
 const estTokens = s => Math.ceil(String(s).length / 4);
 const AUTO_DISMISS = process.env.AGENT_AUTO_DISMISS !== '0';
 
@@ -419,6 +420,89 @@ export function createTools(ab) {
         }
         // Delimitado: el contenido de la web son datos de terceros, no instrucciones
         return untrusted(page.url(), `${head}\n${body}`);
+      },
+    },
+    {
+      name: 'browser_article',
+      description: 'Modo lectura: devuelve el contenido principal de la página en Markdown limpio (título, autor, fecha, encabezados, texto, listas, tablas, enlaces e imágenes), sin menús, anuncios ni pies. Es la forma más barata de leer o resumir un artículo: resúmelo tú a partir de este texto. Con file lo guarda como .md.',
+      schema: {
+        selector: z.string().optional().describe('Contenedor CSS del contenido, si la detección automática falla'),
+        maxChars: z.number().optional().describe('Máximo de caracteres del Markdown (20000)'),
+        file: z.string().optional().describe('Guardar como .md (relativo a ~/.agentic-browser/exports)'),
+      },
+      async run({ selector, maxChars = 20000, file }) {
+        const page = await ab.active();
+        const a = await page.evaluate(articleInPage, { selector, maxChars });
+        const head = [`# ${a.title}`, [a.byline && `por ${a.byline}`, a.date && a.date.slice(0, 10), a.site, `${a.words} palabras · ${a.minutes} min`].filter(Boolean).join(' · '),
+          a.description && `> ${a.description}`].filter(Boolean).join('\n');
+        const body = `${head}\n\n${a.markdown}${a.truncated ? `\n\n(recortado a ${maxChars} caracteres; sube maxChars o usa file)` : ''}`;
+        if (file) {
+          const out = outPath(path.extname(file) ? file : `${file}.md`);
+          fs.writeFileSync(out, `---\ntitle: ${JSON.stringify(a.title)}\nurl: ${a.url}\nauthor: ${JSON.stringify(a.byline)}\ndate: ${JSON.stringify(a.date)}\nsite: ${JSON.stringify(a.site)}\nsaved: ${new Date().toISOString()}\n---\n\n${head}\n\n${a.markdown}\n`);
+          return untrusted(page.url(), `${head}\nguardado en ${out}`);
+        }
+        return untrusted(page.url(), body);
+      },
+    },
+    {
+      name: 'browser_pdf',
+      description: 'Guarda la página activa como PDF (o como MHTML: un único archivo con todo incrustado, copia exacta). Usa la sesión del agente, así que sirve también en páginas con login. Antes recorre la página para que carguen las imágenes diferidas.',
+      schema: {
+        format: z.enum(['pdf', 'mhtml']).optional().describe('pdf (por defecto) o mhtml'),
+        file: z.string().optional().describe('Nombre o ruta del archivo (relativo a ~/.agentic-browser/exports)'),
+        paper: z.enum(['A4', 'Letter', 'Legal']).optional(),
+        landscape: z.boolean().optional(),
+        background: z.boolean().optional().describe('Imprimir fondos y colores (true)'),
+        media: z.enum(['screen', 'print']).optional().describe('screen (por defecto) se ve como en pantalla; print usa la hoja de impresión de la web'),
+        lazy: z.boolean().optional().describe('Recorrer la página antes para cargar imágenes diferidas (true)'),
+      },
+      async run(a) {
+        const page = await ab.active();
+        const r = await savePdf(ab, page, a);
+        return `${r.format.toUpperCase()} guardado en ${r.file} (${Math.round(r.bytes / 1024)} KB)`;
+      },
+    },
+    {
+      name: 'browser_media',
+      description: 'Todo el multimedia de la página (imágenes, vídeos, audio y documentos: lo que hay en el HTML, en los fondos CSS y lo que se cargó por la red) descargado y ordenado en carpetas images/, videos/, audio/, docs/ con un manifest.json (URL de origen, texto alternativo, tamaño, hash). Sin duplicados. Con download:false solo lista. Los streams HLS/DASH se descargan con browser_video. Solo para contenido que puedas guardar: respeta los derechos de autor y los términos de cada sitio.',
+      schema: {
+        types: z.array(z.enum(['image', 'video', 'audio', 'doc'])).optional().describe('Qué tipos (todos por defecto)'),
+        download: z.boolean().optional().describe('false = solo listar (true)'),
+        max: z.number().optional().describe('Máximo de archivos (200)'),
+        minBytes: z.number().optional().describe('Ignorar archivos más pequeños (2000 bytes: iconos y píxeles de seguimiento)'),
+        minWidth: z.number().optional().describe('Ignorar imágenes más estrechas que esto (px)'),
+        backgrounds: z.boolean().optional().describe('Incluir imágenes de fondo CSS (true)'),
+        folder: z.string().optional().describe('Carpeta de salida (relativa a ~/.agentic-browser/exports)'),
+      },
+      async run(a) {
+        const page = await ab.active();
+        const r = await collectMedia(ab, page, a);
+        const streams = r.streams?.length ? `\nstreams de vídeo (descárgalos con browser_video): ${r.streams.length}` : '';
+        if (a.download === false) {
+          const lines = r.listed.map((it, i) => `${i + 1}. ${it.type} ${it.url}${it.alt ? ` "${it.alt.slice(0, 60)}"` : ''}${it.width ? ` ${it.width}×${it.height}` : ''}`);
+          return untrusted(page.url(), `encontrados: ${Object.entries(r.counts).map(([k, v]) => `${v} ${k}`).join(', ') || 'nada'}${streams}\n${lines.join('\n')}`);
+        }
+        const by = {}; for (const s of r.saved) by[s.type] = (by[s.type] || 0) + 1;
+        const why = [...new Set(r.skipped.map(s => s.why))].slice(0, 4).join('; ');
+        return untrusted(page.url(), `guardados ${r.saved.length} archivos en ${r.dir}: ${Object.entries(by).map(([k, v]) => `${v} ${k}`).join(', ') || 'ninguno'}` +
+          `${r.skipped.length ? `\nomitidos ${r.skipped.length} (${why})` : ''}${streams}\nmanifest.json con el origen de cada archivo`);
+      },
+    },
+    {
+      name: 'browser_video',
+      description: 'Descarga el vídeo de la página: archivos directos (MP4/WebM) o streams HLS (.m3u8) y DASH (.mpd), que junta con ffmpeg usando la sesión del agente. Detecta lo que carga el reproductor por la red (si no aparece, dale play unos segundos). Se niega con contenido con DRM (Netflix, Disney+, Spotify…). Úsalo solo con vídeos tuyos o que tengas derecho a guardar: YouTube, TikTok, Instagram y otros prohíben descargar en sus términos. list:true muestra los candidatos.',
+      schema: {
+        list: z.boolean().optional().describe('Solo listar los vídeos encontrados'),
+        index: z.number().optional().describe('Cuál descargar de la lista (0 = el mejor, por defecto)'),
+        file: z.string().optional().describe('Nombre o ruta del archivo (relativo a ~/.agentic-browser/exports)'),
+      },
+      async run(a) {
+        const page = await ab.active();
+        const r = await downloadVideo(ab, page, a);
+        if (a.list) return untrusted(page.url(), r.list.length
+          ? r.list.map((c, i) => `${i}. ${c.kind}${c.bytes ? ` ${Math.round(c.bytes / 1e6)} MB` : ''} ${c.url}`).join('\n') + (r.drm ? '\n⚠ el reproductor usa DRM: no se podrá descargar' : '')
+          : 'no encontré vídeos (si se cargan al reproducir, dale play y vuelve a listar)');
+        return `vídeo ${r.kind} guardado en ${r.file} (${(r.bytes / 1e6).toFixed(1)} MB)`;
       },
     },
     {

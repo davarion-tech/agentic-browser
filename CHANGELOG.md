@@ -3,6 +3,16 @@
 All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows [Semantic Versioning](https://semver.org/).
 
+## [1.4.0] - 2026-10-27
+
+### Added
+- `browser_article`: reader mode. Returns the page's main content as Markdown (title, byline, date, headings, paragraphs, lists, tables, links, images) without navigation, ads, headers or footers; saves a `.md` with front matter when `file` is given. Counted as a perception call.
+- `browser_pdf`: saves the page as PDF (Chrome's print engine, A4/Letter/Legal, backgrounds, screen or print media, lazy images loaded first) or MHTML. Falls back to a headless Chrome with the same cookies if the headed browser can't print.
+- `browser_media`: collects images (`srcset`, CSS backgrounds, `og:image`), video, audio and documents from the DOM and from network responses, downloads them with the agent's session into `images/`, `videos/`, `audio/`, `docs/` plus `manifest.json`; skips duplicates (SHA-1), tiny files and stream segments; respects `AGENT_ALLOWED_ORIGINS`.
+- `browser_video`: downloads direct video files or HLS/DASH streams (ffmpeg, with the page's Referer and cookies). Refuses DRM (EME `mediaKeys`, SAMPLE-AES, Widevine, PlayReady, FairPlay).
+- `AGENT_MEDIA_MAX_MB` (500): size limit per downloaded file. Output paths can't escape `AGENT_EXPORTS`.
+- `npm run test:save`.
+
 ## [1.3.0] - 2026-10-22
 
 ### Added

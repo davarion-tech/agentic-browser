@@ -129,6 +129,15 @@ viewport 1280x800 scroll=0,0 docH=2090
 [f1:1] button "Button inside iframe" @214,217
 ```
 
+## New in 1.4: save anything from a page
+
+- **`browser_article`**: the main content of any page as clean Markdown (title, author, date, headings, lists, tables, links, images), without menus, ads or footers. The cheapest way for your agent to read or summarize an article. `file` saves it as `.md`.
+- **`browser_pdf`**: save the page as **PDF** (A4/Letter/Legal, backgrounds, lazy images loaded first) or **MHTML** (one file, exact copy). It uses the agent's session, so it works behind logins.
+- **`browser_media`**: every image, video, audio file and document on the page (HTML, CSS backgrounds and what the network loaded), downloaded into `images/`, `videos/`, `audio/`, `docs/` with a `manifest.json` (source URL, alt text, size, hash). Duplicates and tracking pixels are skipped.
+- **`browser_video`**: download the page's video, direct files (MP4/WebM) or HLS/DASH streams joined with ffmpeg. It refuses DRM content (Netflix, Disney+, Spotify…). Only for videos you own or have the right to save: YouTube, TikTok, Instagram and others forbid downloading in their terms.
+
+Files go to `~/.agentic-browser/exports` (`AGENT_EXPORTS`); `AGENT_MEDIA_MAX_MB` (500) caps each file.
+
 ## New in 1.3
 
 <p align="center"><a href="docs/media/agentic-browser-watcher.mp4"><img src="docs/assets/watcher-demo.gif" width="100%" alt="Chat watcher demo: drafts a reply, refuses to share bank details, refuses a phishing link"></a></p>
@@ -162,6 +171,10 @@ The chat watcher on a demo chat: it drafts a reply for you to send, and hands ba
 | `browser_navigate` / `browser_history` / `browser_tabs` | Navigation and tabs |
 | `browser_read` / `browser_eval` | Readable text (wrapped as untrusted content); arbitrary JS (only with `AGENT_ALLOW_EVAL=1`) |
 | `browser_extract` | Table or repeated list → JSON or CSV rows (title, url, price, image…). `file` saves it to disk |
+| `browser_article` | Reader mode: the page's main content as clean Markdown, to read or summarize cheaply. `file` saves a `.md` |
+| `browser_pdf` | Save the page as PDF or MHTML, with the agent's session |
+| `browser_media` | Download every image, video, audio file and document, organized in folders with a `manifest.json`. `download:false` only lists |
+| `browser_video` | Download the page's video: direct files or HLS/DASH via ffmpeg. Refuses DRM. `list:true` shows candidates |
 | `browser_teach_start` / `browser_teach_stop` | Record a task the person performs once, as a reusable recipe |
 | `browser_recipes` / `browser_replay` | List or show recipes; replay one with new `params` at almost zero tokens |
 | `browser_stats` | Tokens used this session vs. the screenshot equivalent |
@@ -195,7 +208,8 @@ Most actions accept `snapshot: true` and return the new page state in the same r
 | `AGENT_HUD` | `0` | `1` shows the live token counter from the start |
 | `AGENT_PRIVACY` | — | Privacy mask from the start: `whatsapp`, `telegram`, `gmail` and/or CSS selectors, comma-separated |
 | `AGENT_RECIPES` | `~/.agentic-browser/recipes` | Where taught recipes are saved (JSON) |
-| `AGENT_EXPORTS` | `~/.agentic-browser/exports` | Where `browser_extract` writes files |
+| `AGENT_EXPORTS` | `~/.agentic-browser/exports` | Where `browser_extract`, `browser_article`, `browser_pdf`, `browser_media` and `browser_video` write files |
+| `AGENT_MEDIA_MAX_MB` | `500` | Size limit per downloaded file (media and video) |
 | `AGENT_READONLY` | `0` | `1` disables every tool that changes a page |
 | `AGENT_ALLOWED_ORIGINS` | — | Domain allowlist, e.g. `wikipedia.org,localhost` (subdomains included) |
 | `AGENT_DIALOGS` | `dismiss` | `alert/confirm/prompt`: `dismiss` (default since 1.1.0: a `confirm("Delete?")` is never accepted on its own) or `accept`. The dialog text reaches the agent as an event |
